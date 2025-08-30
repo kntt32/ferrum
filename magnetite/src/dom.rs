@@ -97,7 +97,7 @@ impl DomArena {
         &mut self.arena[idx]
     }
 
-    pub fn current_node(&self) -> NodeIdx {
+    pub fn last_node(&self) -> NodeIdx {
         let len = self.arena.len();
         assert!(1 < len);
         len - 1
@@ -130,9 +130,9 @@ impl DomArena {
         }
     }
 
-    pub fn append_child(&mut self, to: NodeIdx, node: Node) {
+    pub fn append_child(&mut self, to: NodeIdx, node: Node) -> NodeIdx {
         self.arena.push(node);
-        let node_idx = self.current_node();
+        let node_idx = self.last_node();
 
         if let Some(child_idx) = self.child(to) {
             let child_end_idx = self.siblings(child_idx).last().unwrap();
@@ -142,6 +142,8 @@ impl DomArena {
         } else {
             self[to].child = Some(node_idx);
         }
+
+        node_idx
     }
 }
 

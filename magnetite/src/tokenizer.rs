@@ -1,4 +1,6 @@
+use super::dom::Namespace;
 use super::input_stream_preprocessor::InputStreamPreprocessor;
+use std::collections::HashMap;
 
 type State = TokenizerState;
 
@@ -44,6 +46,12 @@ impl Tokenizer {
         Some(c)
     }
 
+    fn unread(&mut self, c: Option<char>) {
+        c.map(|c| {
+            self.string_index -= c.len_utf8();
+        });
+    }
+
     fn look_str(&self, len: usize) -> Option<&str> {
         self.string[self.string_index..].get(..len)
     }
@@ -54,10 +62,10 @@ impl Tokenizer {
         Some(s)
     }
 
-    fn unread(&mut self, c: Option<char>) {
-        c.map(|c| {
-            self.string_index -= c.len_utf8();
-        });
+    fn unread_str(&mut self, s: Option<&str>) {
+        if let Some(s) = s {
+            self.string_index -= s.len();
+        }
     }
 
     fn switch_to(&mut self, state: State) {
@@ -86,6 +94,7 @@ impl Tokenizer {
         &mut self,
         token_notify: &mut impl FnMut(Token),
         error_notify: &mut impl FnMut(ParseError),
+        adjusted_current_node_namespace: &impl Fn() -> Namespace,
     ) {
         match self.state {
             State::Data => self.step_data(token_notify, error_notify),
@@ -93,9 +102,11 @@ impl Tokenizer {
             State::TagOpen => self.step_tag_open(token_notify, error_notify),
             State::TagName => self.step_tag_name(token_notify, error_notify),
             State::EndTagOpen => self.step_end_tag_open(token_notify, error_notify),
-            State::MarkupDeclarationOpen => {
-                self.step_markup_declaration_open(token_notify, error_notify)
-            }
+            State::MarkupDeclarationOpen => self.step_markup_declaration_open(
+                token_notify,
+                error_notify,
+                adjusted_current_node_namespace,
+            ),
             State::Doctype => todo!(),
             _ => unimplemented!("{:?}", self.state),
         }
@@ -103,26 +114,38 @@ impl Tokenizer {
 
     fn step_markup_declaration_open(
         &mut self,
-        _token_notify: &mut impl FnMut(Token),
-        _error_notify: &mut impl FnMut(ParseError),
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+        adjusted_current_node_namespace: &impl Fn() -> Namespace,
     ) {
         assert_eq!(self.state, State::MarkupDeclarationOpen);
-        /*
+
+        const TWO_HYPHEN: &str = "--";
         const DOCTYPE: &str = "DOCTYPE";
         const CDATA: &str = "[CDATA[";
-
-        if self.look_str(2) == Some("--") {
-            self.read_str(2);
+        if self.look_str(TWO_HYPHEN.len()) == Some(TWO_HYPHEN) {
+            self.read_str(TWO_HYPHEN.len());
             self.temporary_token = Some(Token::Comment(String::new()));
             self.switch_to(State::CommentStart);
-        }else if let Some(s) = self.look_str(DOCTYPE.len()) && s.eq_ignore_asci_case(DOCTYPE) {
+        } else if let Some(s) = self.look_str(DOCTYPE.len())
+            && s.eq_ignore_ascii_case(DOCTYPE)
+        {
             self.read_str(DOCTYPE.len());
             self.switch_to(State::Doctype);
-        }else if let Some(s) = self.look_str(CDATA.len()) && s.eq_ignore_asci_case(CDATA) {
+        } else if self.look_str(CDATA.len()) == Some(CDATA) {
             self.read_str(CDATA.len());
-            self.
-        }*/
-        todo!();
+            if adjusted_current_node_namespace() == Namespace::Html {
+                self.switch_to(State::CDataSection);
+            } else {
+                error_notify(ParseError::CDataInHtmlContent);
+                self.temporary_token = Some(Token::Comment(CDATA.to_string()));
+                self.switch_to(State::BogusComment);
+            }
+        } else {
+            error_notify(ParseError::IncorrectlyOpenedComment);
+            self.temporary_token = Some(Token::Comment(String::new()));
+            self.switch_to(State::BogusComment);
+        }
     }
 
     fn step_data(
@@ -156,9 +179,7 @@ impl Tokenizer {
             Some('!') => self.switch_to(State::MarkupDeclarationOpen),
             Some('/') => self.switch_to(State::EndTagOpen),
             Some(c) if c.is_ascii_alphabetic() => {
-                self.temporary_token = Some(Token::StartTag {
-                    name: String::new(),
-                });
+                self.temporary_token = Some(Token::new_start_tag());
                 self.unread(Some(c));
                 self.switch_to(State::TagName);
             }
@@ -232,7 +253,7 @@ impl Tokenizer {
             Some('\0') => {
                 error_notify(ParseError::UnexpectedNullCharacter);
                 let name = match self.temporary_token {
-                    Some(Token::StartTag { ref mut name }) => name,
+                    Some(Token::StartTag { ref mut name, .. }) => name,
                     Some(Token::EndTag { ref mut name }) => name,
                     _ => panic!(),
                 };
@@ -240,7 +261,7 @@ impl Tokenizer {
             }
             Some(mut c) => {
                 let name = match self.temporary_token {
-                    Some(Token::StartTag { ref mut name }) => name,
+                    Some(Token::StartTag { ref mut name, .. }) => name,
                     Some(Token::EndTag { ref mut name }) => name,
                     _ => panic!(),
                 };
@@ -290,6 +311,10 @@ pub enum ParseError {
     EofInTag,
     MissingEndTagName,
     ExpectedDoctypeButGotSomethingElse,
+    UnexpectedDoctype,
+    UnexpectedEndTag,
+    CDataInHtmlContent,
+    IncorrectlyOpenedComment,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -380,10 +405,28 @@ impl TokenizerState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Token {
-    Doctype(String),
-    StartTag { name: String },
-    EndTag { name: String },
+    Doctype {
+        name: Option<String>,
+        public_id: Option<String>,
+        system_id: Option<String>,
+    },
+    StartTag {
+        name: String,
+        attributes: HashMap<String, String>,
+    },
+    EndTag {
+        name: String,
+    },
     Comment(String),
     Character(char),
     Eof,
+}
+
+impl Token {
+    pub fn new_start_tag() -> Self {
+        Self::StartTag {
+            name: String::new(),
+            attributes: HashMap::new(),
+        }
+    }
 }

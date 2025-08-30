@@ -5,7 +5,7 @@ use magnetite::tokenizer::Tokenizer;
 use std::io::Cursor;
 
 pub fn main() {
-    let stream = Cursor::new("<h1>Hello, World!</h1><p>This is magnetie!</p>");
+    let stream = Cursor::new("<!DOCTYPE html><h1>Hello, World!</h1><p>This is magnetie!</p>");
     let byte_stream_decoder = ByteStreamDecoder::new(stream);
     let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
     let mut tokenizer = Tokenizer::new(input_stream_preprocessor);
@@ -20,6 +20,7 @@ pub fn main() {
                 tokens.push(t)
             },
             &mut |e| errors.push(e),
+            &|| panic!("a"),
         );
         if tokens.last() == Some(&Token::Eof) {
             break;
