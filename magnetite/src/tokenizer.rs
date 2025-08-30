@@ -2,7 +2,6 @@ use super::input_stream_preprocessor::InputStreamPreprocessor;
 
 type State = TokenizerState;
 
-#[derive(Debug)]
 pub struct Tokenizer {
     state: State,
     return_state: Option<State>,
@@ -10,8 +9,6 @@ pub struct Tokenizer {
     string_index: usize,
     temporary_buffer: String,
     temporary_token: Option<Token>,
-    tokens: Vec<Token>,
-    errors: Vec<ParseError>,
 }
 
 impl Tokenizer {
@@ -23,22 +20,16 @@ impl Tokenizer {
             string_index: 0,
             temporary_buffer: String::new(),
             temporary_token: None,
-            tokens: Vec::new(),
-            errors: Vec::new(),
         }
     }
 
-    fn emit(&mut self, token: Token) {
-        self.tokens.push(token);
+    pub fn state(&self) -> State {
+        self.state
     }
 
-    fn error(&mut self, error: ParseError) {
-        self.errors.push(error);
-    }
-
-    fn flush(&mut self) {
+    fn flush(&mut self, token_notify: &mut impl FnMut(Token)) {
         for c in self.temporary_buffer.chars() {
-            self.tokens.push(Token::Character(c));
+            token_notify(Token::Character(c));
         }
         self.temporary_buffer.clear();
     }
@@ -51,6 +42,16 @@ impl Tokenizer {
         let c = self.look()?;
         self.string_index += c.len_utf8();
         Some(c)
+    }
+
+    fn look_str(&self, len: usize) -> Option<&str> {
+        self.string[self.string_index..].get(..len)
+    }
+
+    fn read_str(&mut self, len: usize) -> Option<&str> {
+        let s = self.string[self.string_index..].get(..len)?;
+        self.string_index += len;
+        Some(s)
     }
 
     fn unread(&mut self, c: Option<char>) {
@@ -81,17 +82,54 @@ impl Tokenizer {
         }
     }
 
-    pub fn step(&mut self) {
+    pub fn step(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
         match self.state {
-            State::Data => self.step_data(),
-            State::CharacterReference => self.step_character_reference(),
-            State::TagOpen => self.step_tag_open(),
-            State::TagName => self.step_tag_name(),
-            _ => todo!(),
+            State::Data => self.step_data(token_notify, error_notify),
+            State::CharacterReference => self.step_character_reference(token_notify, error_notify),
+            State::TagOpen => self.step_tag_open(token_notify, error_notify),
+            State::TagName => self.step_tag_name(token_notify, error_notify),
+            State::EndTagOpen => self.step_end_tag_open(token_notify, error_notify),
+            State::MarkupDeclarationOpen => {
+                self.step_markup_declaration_open(token_notify, error_notify)
+            }
+            State::Doctype => todo!(),
+            _ => unimplemented!("{:?}", self.state),
         }
     }
 
-    fn step_data(&mut self) {
+    fn step_markup_declaration_open(
+        &mut self,
+        _token_notify: &mut impl FnMut(Token),
+        _error_notify: &mut impl FnMut(ParseError),
+    ) {
+        assert_eq!(self.state, State::MarkupDeclarationOpen);
+        /*
+        const DOCTYPE: &str = "DOCTYPE";
+        const CDATA: &str = "[CDATA[";
+
+        if self.look_str(2) == Some("--") {
+            self.read_str(2);
+            self.temporary_token = Some(Token::Comment(String::new()));
+            self.switch_to(State::CommentStart);
+        }else if let Some(s) = self.look_str(DOCTYPE.len()) && s.eq_ignore_asci_case(DOCTYPE) {
+            self.read_str(DOCTYPE.len());
+            self.switch_to(State::Doctype);
+        }else if let Some(s) = self.look_str(CDATA.len()) && s.eq_ignore_asci_case(CDATA) {
+            self.read_str(CDATA.len());
+            self.
+        }*/
+        todo!();
+    }
+
+    fn step_data(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
         assert_eq!(self.state, State::Data);
 
         match self.read() {
@@ -100,16 +138,20 @@ impl Tokenizer {
                 self.switch_to(State::CharacterReference);
             }
             Some('\0') => {
-                self.error(ParseError::UnexpectedNullCharacter);
-                self.emit(Token::Character('\0'));
+                error_notify(ParseError::UnexpectedNullCharacter);
+                token_notify(Token::Character('\0'));
             }
             Some('<') => self.switch_to(State::TagOpen),
-            Some(c) => self.emit(Token::Character(c)),
-            None => self.emit(Token::Eof),
+            Some(c) => token_notify(Token::Character(c)),
+            None => token_notify(Token::Eof),
         }
     }
 
-    fn step_tag_open(&mut self) {
+    fn step_tag_open(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
         match self.read() {
             Some('!') => self.switch_to(State::MarkupDeclarationOpen),
             Some('/') => self.switch_to(State::EndTagOpen),
@@ -121,26 +163,62 @@ impl Tokenizer {
                 self.switch_to(State::TagName);
             }
             Some('?') => {
-                self.error(ParseError::UnexpectedQuestionMarkInsteadOfTagName);
+                error_notify(ParseError::UnexpectedQuestionMarkInsteadOfTagName);
                 self.temporary_token = Some(Token::Comment(String::new()));
                 self.unread(Some('?'));
                 self.switch_to(State::BogusComment);
             }
             None => {
-                self.error(ParseError::EofBeforeTagName);
-                self.emit(Token::Character('<'));
-                self.emit(Token::Eof);
+                error_notify(ParseError::EofBeforeTagName);
+                token_notify(Token::Character('<'));
+                token_notify(Token::Eof);
             }
             Some(c) => {
-                self.error(ParseError::InvalidFirstCharacterOfTagName);
-                self.emit(Token::Character('<'));
+                error_notify(ParseError::InvalidFirstCharacterOfTagName);
+                token_notify(Token::Character('<'));
                 self.unread(Some(c));
                 self.switch_to(State::Data);
             }
         }
     }
 
-    fn step_tag_name(&mut self) {
+    fn step_end_tag_open(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some(c) if c.is_ascii_alphabetic() => {
+                self.temporary_token = Some(Token::EndTag {
+                    name: String::new(),
+                });
+                self.unread(Some(c));
+                self.switch_to(State::TagName);
+            }
+            Some('>') => {
+                error_notify(ParseError::MissingEndTagName);
+                self.switch_to(State::Data);
+            }
+            None => {
+                error_notify(ParseError::EofBeforeTagName);
+                token_notify(Token::Character('<'));
+                token_notify(Token::Character('/'));
+                token_notify(Token::Eof);
+            }
+            Some(c) => {
+                error_notify(ParseError::InvalidFirstCharacterOfTagName);
+                self.temporary_token = Some(Token::Comment(String::new()));
+                self.unread(Some(c));
+                self.switch_to(State::BogusComment);
+            }
+        }
+    }
+
+    fn step_tag_name(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
         match self.read() {
             Some('\u{0009}') | Some('\u{000a}') | Some('\u{000c}') | Some('\u{0020}') => {
                 self.switch_to(State::BeforeAttributeName)
@@ -148,37 +226,41 @@ impl Tokenizer {
             Some('\u{002f}') => self.switch_to(State::SelfClosingStartTag),
             Some('\u{003e}') => {
                 let token = self.temporary_token.take().unwrap();
-                self.emit(token);
+                token_notify(token);
                 self.switch_to(State::Data);
             }
-            Some(mut c) if c.is_ascii_uppercase() => {
-                let Some(Token::StartTag { ref mut name }) = self.temporary_token else {
-                    panic!();
-                };
-                c.make_ascii_lowercase();
-                name.push(c);
-            }
             Some('\0') => {
-                self.error(ParseError::UnexpectedNullCharacter);
-                let Some(Token::StartTag { ref mut name }) = self.temporary_token else {
-                    panic!();
+                error_notify(ParseError::UnexpectedNullCharacter);
+                let name = match self.temporary_token {
+                    Some(Token::StartTag { ref mut name }) => name,
+                    Some(Token::EndTag { ref mut name }) => name,
+                    _ => panic!(),
                 };
                 name.push('\u{fffd}');
             }
-            None => {
-                self.error(ParseError::EofInTag);
-                self.emit(Token::Eof);
-            }
-            Some(c) => {
-                let Some(Token::StartTag { ref mut name }) = self.temporary_token else {
-                    panic!();
+            Some(mut c) => {
+                let name = match self.temporary_token {
+                    Some(Token::StartTag { ref mut name }) => name,
+                    Some(Token::EndTag { ref mut name }) => name,
+                    _ => panic!(),
                 };
+                if c.is_ascii_uppercase() {
+                    c.make_ascii_lowercase();
+                }
                 name.push(c);
+            }
+            None => {
+                error_notify(ParseError::EofInTag);
+                token_notify(Token::Eof);
             }
         }
     }
 
-    fn step_character_reference(&mut self) {
+    fn step_character_reference(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        _error_notify: &mut impl FnMut(ParseError),
+    ) {
         assert_eq!(self.state, State::CharacterReference);
 
         match self.read() {
@@ -193,7 +275,7 @@ impl Tokenizer {
             c => {
                 self.unread(c);
                 self.return_state();
-                self.flush();
+                self.flush(token_notify);
             }
         }
     }
@@ -206,10 +288,11 @@ pub enum ParseError {
     EofBeforeTagName,
     InvalidFirstCharacterOfTagName,
     EofInTag,
+    MissingEndTagName,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum TokenizerState {
+pub enum TokenizerState {
     Data,
     RcData,
     RawText,
@@ -298,7 +381,7 @@ impl TokenizerState {
 pub enum Token {
     Doctype,
     StartTag { name: String },
-    EndTag,
+    EndTag { name: String },
     Comment(String),
     Character(char),
     Eof,
