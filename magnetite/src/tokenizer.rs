@@ -289,6 +289,7 @@ pub enum ParseError {
     InvalidFirstCharacterOfTagName,
     EofInTag,
     MissingEndTagName,
+    ExpectedDoctypeButGotSomethingElse,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -379,7 +380,7 @@ impl TokenizerState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Token {
-    Doctype,
+    Doctype(String),
     StartTag { name: String },
     EndTag { name: String },
     Comment(String),

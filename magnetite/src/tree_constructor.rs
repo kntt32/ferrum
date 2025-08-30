@@ -8,6 +8,7 @@ pub struct TreeConstructor {
     insertion_mode: InsertionMode,
     mode_flag: bool,
     context_element: Option<DomNodeIdx>,
+    errors: Vec<ParseError>,
 }
 
 impl TreeConstructor {
@@ -19,7 +20,12 @@ impl TreeConstructor {
             insertion_mode: InsertionMode::INIT,
             mode_flag: false,
             context_element: None,
+            errors: Vec::new(),
         }
+    }
+
+    fn error(&mut self, error: ParseError) {
+        self.errors.push(error);
     }
 
     fn current_node(&self) -> DomNodeIdx {
@@ -50,6 +56,14 @@ impl TreeConstructor {
         }
     }
 
+    fn switch_to(&mut self, insertion_mode: InsertionMode) {
+        self.insertion_mode = insertion_mode;
+    }
+
+    fn reprocess(&mut self, token: Token) {
+        self.handle_token(token);
+    }
+
     pub fn handle_token_init(&mut self, token: Token) {
         match token {
             Token::Character(c)
@@ -57,7 +71,12 @@ impl TreeConstructor {
             {
                 ()
             }
-            Token::Comment(comment) => todo!(),
+            Token::Comment(comment) => self.dom.append_child(
+                DomArena::DOCUMENT_IDX,
+                DomNode::new(DomNodeType::Comment(comment), Namespace::Html),
+            ),
+            Token::Doctype(ref s) if s.eq_ignore_ascii_case("html") => todo!(),
+            Token::Doctype(_) => todo!(),
             _ => todo!(),
         }
     }

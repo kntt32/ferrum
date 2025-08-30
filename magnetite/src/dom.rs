@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::iter::Iterator;
+use std::ops::Index;
+use std::ops::IndexMut;
 use std::str::FromStr;
 
 pub type DomNodeIdx = usize;
@@ -63,10 +65,12 @@ impl FromStr for Namespace {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DomNodeType {
     Document,
+    DocType(String),
     Element {
         name: String,
         attributes: HashMap<String, String>,
     },
+    Comment(String),
     Text(String),
 }
 
@@ -111,6 +115,10 @@ impl DomArena {
         None
     }
 
+    pub fn parent(&self, node: NodeIdx) -> Option<NodeIdx> {
+        self.arena[node].parent
+    }
+
     pub fn child(&self, node: NodeIdx) -> Option<NodeIdx> {
         self.arena[node].child
     }
@@ -121,9 +129,48 @@ impl DomArena {
             node_index: node,
         }
     }
+
+    pub fn append_child(&mut self, to: NodeIdx, node: Node) {
+        self.arena.push(node);
+        let node_idx = self.current_node();
+
+        if let Some(child_idx) = self.child(to) {
+            let child_end_idx = self.siblings(child_idx).last().unwrap();
+            self[node_idx].parent = Some(to);
+            self[node_idx].prev = Some(child_end_idx);
+            self[child_end_idx].next = Some(node_idx);
+        } else {
+            self[to].child = Some(node_idx);
+        }
+    }
+}
+
+impl Index<NodeIdx> for DomArena {
+    type Output = Node;
+
+    fn index(&self, index: NodeIdx) -> &Node {
+        self.get(index)
+    }
+}
+
+impl IndexMut<NodeIdx> for DomArena {
+    fn index_mut(&mut self, index: NodeIdx) -> &mut Node {
+        self.get_mut(index)
+    }
 }
 
 impl DomNode {
+    pub fn new(node_type: DomNodeType, namespace: Namespace) -> Self {
+        Self {
+            parent: None,
+            child: None,
+            namespace,
+            node_type,
+            prev: None,
+            next: None,
+        }
+    }
+
     pub fn document() -> Self {
         Self {
             parent: None,
@@ -148,7 +195,8 @@ impl<'a> Iterator for Siblings<'a> {
     type Item = NodeIdx;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.node_index = self.dom_arena.get(self.node_index).next?;
-        Some(self.node_index)
+        let node_index = self.node_index;
+        self.node_index = self.dom_arena.get(node_index).next?;
+        Some(node_index)
     }
 }
