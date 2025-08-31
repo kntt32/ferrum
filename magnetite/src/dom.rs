@@ -71,13 +71,13 @@ pub enum DomNodeType {
         attributes: HashMap<String, String>,
     },
     Comment(String),
-    Text(String),
+    Character(char),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Siblings<'a> {
     dom_arena: &'a DomArena,
-    node_index: NodeIdx,
+    node_index: Option<NodeIdx>,
 }
 
 impl DomArena {
@@ -102,16 +102,29 @@ impl DomArena {
         assert!(1 < len);
         len - 1
     }
+    /*
+        pub fn get_last_element(&self, name: &str) -> Option<NodeIdx> {
+            for i in (0..self.arena.len()).rev() {
+                if let NodeType::Element { name: ref n, .. } = self.arena[i].node_type
+                    && n == name
+                {
+                    return Some(i);
+                }
+            }
 
-    pub fn get_last_element(&self, name: &str) -> Option<NodeIdx> {
-        for i in (0..self.arena.len()).rev() {
-            if let NodeType::Element { name: ref n, .. } = self.arena[i].node_type
-                && n == name
+            None
+        }
+    */
+
+    pub fn get_child_element(&self, parent: NodeIdx, name: &str) -> Option<NodeIdx> {
+        let child = self.child(parent)?;
+        for element in self.siblings(child) {
+            if let DomNodeType::Element { name: ref s, .. } = self[element].node_type
+                && s == name
             {
-                return Some(i);
+                return Some(element);
             }
         }
-
         None
     }
 
@@ -126,8 +139,13 @@ impl DomArena {
     pub fn siblings(&self, node: NodeIdx) -> Siblings<'_> {
         Siblings {
             dom_arena: self,
-            node_index: node,
+            node_index: Some(node),
         }
+    }
+
+    pub fn push(&mut self, node: Node) -> NodeIdx {
+        self.arena.push(node);
+        self.last_node()
     }
 
     pub fn append_child(&mut self, to: NodeIdx, node: Node) -> NodeIdx {
@@ -197,8 +215,8 @@ impl<'a> Iterator for Siblings<'a> {
     type Item = NodeIdx;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let node_index = self.node_index;
-        self.node_index = self.dom_arena.get(node_index).next?;
+        let node_index = self.node_index?;
+        self.node_index = self.dom_arena.get(node_index).next;
         Some(node_index)
     }
 }

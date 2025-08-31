@@ -96,6 +96,11 @@ impl Tokenizer {
         error_notify: &mut impl FnMut(ParseError),
         adjusted_current_node_namespace: &impl Fn() -> Namespace,
     ) {
+        if self.look().is_none() {
+            token_notify(Token::Eof);
+            return;
+        }
+
         match self.state {
             State::Data => self.step_data(token_notify, error_notify),
             State::CharacterReference => self.step_character_reference(token_notify, error_notify),
@@ -107,14 +112,146 @@ impl Tokenizer {
                 error_notify,
                 adjusted_current_node_namespace,
             ),
-            State::Doctype => todo!(),
+            State::Doctype => self.step_doctype(token_notify, error_notify),
+            State::BeforeDoctypeName => self.step_before_doctype_name(token_notify, error_notify),
+            State::DoctypeName => self.step_doctype_name(token_notify, error_notify),
             _ => unimplemented!("{:?}", self.state),
+        }
+    }
+
+    fn step_doctype_name(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => {
+                self.switch_to(State::AfterDoctypeName)
+            }
+            Some('\u{003e}') => {
+                self.switch_to(State::Data);
+                token_notify(self.temporary_token.take().unwrap());
+            }
+            Some('\0') => {
+                error_notify(ParseError::UnexpectedNullCharacter);
+                let Some(Token::Doctype { ref mut name, .. }) = self.temporary_token else {
+                    panic!();
+                };
+                if name.is_none() {
+                    *name = Some(String::new());
+                }
+                name.as_mut().unwrap().push('\u{fffd}');
+            }
+            None => {
+                error_notify(ParseError::EofInDoctype);
+                let Some(Token::Doctype {
+                    ref mut force_quirks,
+                    ..
+                }) = self.temporary_token
+                else {
+                    panic!();
+                };
+                *force_quirks = true;
+                token_notify(self.temporary_token.take().unwrap());
+                token_notify(Token::Eof);
+            }
+            Some(mut c) => {
+                c.make_ascii_lowercase();
+                let Some(Token::Doctype { ref mut name, .. }) = self.temporary_token else {
+                    panic!();
+                };
+                if name.is_none() {
+                    *name = Some(String::new());
+                }
+                name.as_mut().unwrap().push(c);
+            }
+        }
+    }
+
+    fn step_before_doctype_name(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => (),
+            Some('\0') => {
+                error_notify(ParseError::UnexpectedNullCharacter);
+                self.temporary_token = Some(Token::Doctype {
+                    name: Some("\u{fffd}".to_string()),
+                    public_id: None,
+                    system_id: None,
+                    force_quirks: false,
+                });
+                self.switch_to(State::DoctypeName);
+            }
+            Some('>') => {
+                error_notify(ParseError::MissingDoctypeName);
+                token_notify(Token::Doctype {
+                    name: Some(String::new()),
+                    public_id: None,
+                    system_id: None,
+                    force_quirks: true,
+                });
+                self.switch_to(State::Data);
+            }
+            None => {
+                error_notify(ParseError::EofInDoctype);
+                token_notify(Token::Doctype {
+                    name: Some(String::new()),
+                    public_id: None,
+                    system_id: None,
+                    force_quirks: true,
+                });
+                token_notify(Token::Eof);
+            }
+            Some(mut c) => {
+                c.make_ascii_lowercase();
+                self.temporary_token = Some(Token::Doctype {
+                    name: Some(format!("{}", c)),
+                    public_id: None,
+                    system_id: None,
+                    force_quirks: false,
+                });
+                self.switch_to(State::DoctypeName);
+            }
+        }
+    }
+
+    fn step_doctype(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => {
+                self.switch_to(State::BeforeDoctypeName)
+            }
+            Some('>') => {
+                self.unread(Some('>'));
+                self.switch_to(State::BeforeDoctypeName);
+            }
+            None => {
+                error_notify(ParseError::EofInDoctype);
+                token_notify(Token::Doctype {
+                    name: None,
+                    public_id: None,
+                    system_id: None,
+                    force_quirks: true,
+                });
+                token_notify(Token::Eof);
+            }
+            Some(c) => {
+                error_notify(ParseError::MissingWhitespceBeforeDoctypeName);
+                self.unread(Some(c));
+                self.switch_to(State::BeforeDoctypeName);
+            }
         }
     }
 
     fn step_markup_declaration_open(
         &mut self,
-        token_notify: &mut impl FnMut(Token),
+        _token_notify: &mut impl FnMut(Token),
         error_notify: &mut impl FnMut(ParseError),
         adjusted_current_node_namespace: &impl Fn() -> Namespace,
     ) {
@@ -315,6 +452,10 @@ pub enum ParseError {
     UnexpectedEndTag,
     CDataInHtmlContent,
     IncorrectlyOpenedComment,
+    EofInDoctype,
+    MissingWhitespceBeforeDoctypeName,
+    MissingDoctypeName,
+    UnexpectedHeadTag,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -409,6 +550,7 @@ pub enum Token {
         name: Option<String>,
         public_id: Option<String>,
         system_id: Option<String>,
+        force_quirks: bool,
     },
     StartTag {
         name: String,
