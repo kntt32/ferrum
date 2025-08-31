@@ -459,6 +459,7 @@ pub enum ParseError {
     UnclosedElementAtEof,
     UnclosedElement,
     UnexpectedStartTag,
+    ElementNotFoundInButtonScope,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

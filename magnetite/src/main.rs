@@ -6,16 +6,7 @@ use magnetite::tree_constructor::*;
 use std::io::Cursor;
 
 pub fn main() {
-    let stream = Cursor::new(
-        r#"
-<!DOCTYPE html>
-<html>
-    <h1>
-        Hello, World!
-    </h1>
-</html>
-"#,
-    );
+    let stream = Cursor::new(r#"<!DOCTYPE html><html><h1>Hello</h1><p>a</p></html>"#);
     let byte_stream_decoder = ByteStreamDecoder::new(stream);
     let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
     let mut tokenizer = Tokenizer::new(input_stream_preprocessor);
@@ -38,7 +29,4 @@ pub fn main() {
         }
         tokens.clear();
     }
-
-    println!("tokens: {:?}", tokens);
-    println!("errors: {:?}", errors);
 }

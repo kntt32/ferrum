@@ -170,6 +170,7 @@ impl DomArena {
             self[child_end_idx].next = Some(node_idx);
         } else {
             self[to].child = Some(node_idx);
+            self[node_idx].parent = Some(to);
         }
 
         node_idx

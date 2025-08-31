@@ -149,6 +149,42 @@ impl TreeConstructor {
         }
     }
 
+    fn has_an_element_in_scope(&self, name: &str) -> bool {
+        const SCOPE: &[&str] = &[
+            "applet", "caption", "html", "table", "td", "th", "marquee", "object", "select",
+            "template",
+        ];
+        for idx in &self.open_elements {
+            if let DomNodeType::Element { name: ref n, .. } = self.arena[*idx].node_type {
+                if n == name {
+                    return true;
+                }
+                if SCOPE.contains(&n.as_str()) {
+                    return false;
+                }
+            }
+        }
+        false
+    }
+
+    fn has_an_element_in_button_scope(&self, name: &str) -> bool {
+        if self.has_an_element_in_scope(name) {
+            true
+        } else {
+            for idx in &self.open_elements {
+                if let DomNodeType::Element { name: ref n, .. } = self.arena[*idx].node_type {
+                    if n == name && self.arena[*idx].namespace() == Namespace::Html {
+                        return true;
+                    }
+                    if n == "button" {
+                        return false;
+                    }
+                }
+            }
+            false
+        }
+    }
+
     fn handle_token_in_body(&mut self, token: Token) {
         match token {
             Token::Character('\0') => self.error(ParseError::UnexpectedNullCharacter),
@@ -310,6 +346,22 @@ impl TreeConstructor {
                     self.close_element(&name);
                 }
             }
+            Token::EndTag { name } if &name == "p" => {
+                if !self.has_an_element_in_button_scope("p") {
+                    self.error(ParseError::ElementNotFoundInButtonScope);
+                    self.insert(
+                        DomNode::new(
+                            DomNodeType::Element {
+                                name: "p".to_string(),
+                                attributes: HashMap::new(),
+                            },
+                            self.adjusted_current_node_namespace(),
+                        ),
+                        false,
+                    );
+                }
+                self.close_element("p");
+            }
             Token::EndTag { name } => {
                 if !self.opened_element("html") {
                     self.error(ParseError::UnexpectedEndTag);
@@ -317,7 +369,6 @@ impl TreeConstructor {
                     self.close_element(&name);
                 }
             }
-            _ => unimplemented!("{:?}", token),
         }
     }
 
