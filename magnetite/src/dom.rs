@@ -17,7 +17,7 @@ pub struct DomArena {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DomNode {
     namespace: Namespace,
-    node_type: NodeType,
+    pub node_type: NodeType,
     parent: Option<NodeIdx>,
     child: Option<NodeIdx>,
     prev: Option<NodeIdx>,
@@ -115,6 +115,17 @@ impl DomArena {
             None
         }
     */
+
+    pub fn get_element(&self, name: &str) -> Option<NodeIdx> {
+        for i in 0..self.arena.len() {
+            if let DomNodeType::Element { name: ref s, .. } = self[i].node_type
+                && s == name
+            {
+                return Some(i);
+            }
+        }
+        None
+    }
 
     pub fn get_child_element(&self, parent: NodeIdx, name: &str) -> Option<NodeIdx> {
         let child = self.child(parent)?;

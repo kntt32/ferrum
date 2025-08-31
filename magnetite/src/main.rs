@@ -13,9 +13,6 @@ pub fn main() {
     <h1>
         Hello, World!
     </h1>
-    <p>
-        This is magnetie!
-    </p>
 </html>
 "#,
     );

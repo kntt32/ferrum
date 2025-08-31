@@ -53,6 +53,9 @@ impl TreeConstructor {
     }
 
     fn error(&mut self, error: ParseError) {
+        if error == ParseError::UnexpectedEndTag {
+            panic!();
+        }
         self.errors.push(error);
     }
 
@@ -108,8 +111,229 @@ impl TreeConstructor {
         }
     }
 
-    fn handle_token_in_body(&mut self, _token: Token) {
-        todo!()
+    fn opened_element(&self, name: &str) -> bool {
+        for i in 1..self.open_elements.len() {
+            let idx = self.open_elements[i];
+            if let DomNodeType::Element { name: ref n, .. } = self.arena[idx].node_type
+                && n == name
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn close_element(&mut self, name: &str) {
+        for i in (1..self.open_elements.len()).rev() {
+            let idx = self.open_elements[i];
+            if let DomNodeType::Element { name: ref n, .. } = self.arena[idx].node_type
+                && n == name
+            {
+                self.open_elements.resize_with(i, || panic!());
+                break;
+            }
+        }
+    }
+
+    fn close_element_until(&mut self, close: &[&str], until: &str) {
+        for i in (1..self.open_elements.len()).rev() {
+            let idx = self.open_elements[i];
+            if let DomNodeType::Element { name: ref n, .. } = self.arena[idx].node_type {
+                if n == until {
+                    break;
+                }
+                if close.contains(&n.as_str()) {
+                    self.open_elements.remove(i);
+                }
+            }
+        }
+    }
+
+    fn handle_token_in_body(&mut self, token: Token) {
+        match token {
+            Token::Character('\0') => self.error(ParseError::UnexpectedNullCharacter),
+            Token::Character(c)
+                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
+            {
+                self.reconstruct_the_active_formatting_elements();
+                self.insert(
+                    DomNode::new(
+                        DomNodeType::Character(c),
+                        self.adjusted_current_node_namespace(),
+                    ),
+                    false,
+                );
+            }
+            Token::Character(c) => {
+                self.reconstruct_the_active_formatting_elements();
+                self.insert(
+                    DomNode::new(
+                        DomNodeType::Character(c),
+                        self.adjusted_current_node_namespace(),
+                    ),
+                    false,
+                );
+                self.frameset_ok = false;
+            }
+            Token::Comment(text) => {
+                self.insert_comment(text);
+            }
+            Token::Doctype { .. } => self.error(ParseError::UnexpectedDoctype),
+            Token::StartTag { name, attributes } if &name == "html" => {
+                self.error(ParseError::UnexpectedStartTag);
+                if let Some(html_idx) = self.arena.get_child_element(DomArena::DOCUMENT_IDX, "html")
+                {
+                    if let DomNodeType::Element {
+                        attributes: ref mut real_attributes,
+                        ..
+                    } = self.arena[html_idx].node_type
+                    {
+                        for attribute in attributes {
+                            if !real_attributes.contains_key(&attribute.0) {
+                                real_attributes.insert(attribute.0.clone(), attribute.1.clone());
+                            }
+                        }
+                    }
+                }
+            }
+            Token::StartTag { ref name, .. }
+                if [
+                    "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style",
+                    "template", "title",
+                ]
+                .contains(&name.as_str()) =>
+            {
+                self.switch_to(InsertionMode::InHead);
+                self.handle_token(token);
+            }
+            Token::EndTag { ref name, .. } if name == "template" => {
+                self.switch_to(InsertionMode::InHead);
+                self.handle_token(token);
+            }
+            Token::StartTag { ref name, .. } if ["body", "frameset"].contains(&name.as_str()) => {
+                unimplemented!();
+            }
+            Token::Eof => {
+                if !self.template_insertion_modes.is_empty() {
+                    self.switch_to(InsertionMode::InTemplate);
+                    self.handle_token(token);
+                } else {
+                    for i in 1..self.open_elements.len() {
+                        let node_idx = self.open_elements[i];
+                        if let DomNodeType::Element { ref name, .. } =
+                            self.arena[node_idx].node_type
+                            && ![
+                                "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt",
+                                "rtc", "tbody", "td", "tfoot", "th", "thead", "tr", "body", "html",
+                            ]
+                            .contains(&name.as_str())
+                        {
+                            self.error(ParseError::UnclosedElementAtEof);
+                            break;
+                        }
+                    }
+                }
+            }
+            Token::EndTag { ref name, .. } if name == "body" => {
+                if self.opened_element("html") {
+                    self.error(ParseError::UnclosedElement);
+                } else {
+                    for i in 1..self.open_elements.len() {
+                        let node_idx = self.open_elements[i];
+                        if let DomNodeType::Element { ref name, .. } =
+                            self.arena[node_idx].node_type
+                            && ![
+                                "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt",
+                                "rtc", "tbody", "td", "tfoot", "th", "thead", "tr", "body", "html",
+                            ]
+                            .contains(&name.as_str())
+                        {
+                            self.error(ParseError::UnclosedElement);
+                            break;
+                        }
+                    }
+
+                    self.switch_to(InsertionMode::AfterBody);
+                }
+            }
+            Token::StartTag { name, attributes }
+                if ["h1", "h2", "h3", "h4", "h5", "h6"].contains(&name.as_str()) =>
+            {
+                if self.opened_element("p") {
+                    self.close_element("p");
+                }
+                if let DomNodeType::Element { ref name, .. } =
+                    self.arena[self.current_node()].node_type
+                    && ["h1", "h2", "h3", "h4", "h5", "h6"].contains(&name.as_str())
+                {
+                    self.open_elements.pop();
+                }
+                self.insert(
+                    DomNode::new(
+                        DomNodeType::Element { name, attributes },
+                        self.adjusted_current_node_namespace(),
+                    ),
+                    false,
+                );
+            }
+            Token::StartTag { name, attributes } => {
+                self.reconstruct_the_active_formatting_elements();
+                self.insert(
+                    DomNode::new(
+                        DomNodeType::Element { name, attributes },
+                        self.adjusted_current_node_namespace(),
+                    ),
+                    false,
+                );
+            }
+            Token::EndTag { name }
+                if ["h1", "h2", "h3", "h4", "h5", "h6"].contains(&name.as_str()) =>
+            {
+                if !self.opened_element(&name) {
+                    self.error(ParseError::UnexpectedEndTag);
+                } else {
+                    self.close_element_until(
+                        &[
+                            "dd", "dt", "li", "option", "optgroup", "p", "rb", "rp", "rt", "rtc",
+                        ],
+                        "h1",
+                    );
+                    let current_node = self.current_node();
+                    let DomNodeType::Element { name: ref n, .. } =
+                        self.arena[current_node].node_type
+                    else {
+                        panic!();
+                    };
+                    if &name != n {
+                        self.error(ParseError::UnexpectedEndTag);
+                    }
+                    self.close_element(&name);
+                }
+            }
+            Token::EndTag { name } => {
+                if !self.opened_element("html") {
+                    self.error(ParseError::UnexpectedEndTag);
+                } else {
+                    self.close_element(&name);
+                }
+            }
+            _ => unimplemented!("{:?}", token),
+        }
+    }
+
+    fn reconstruct_the_active_formatting_elements(&mut self) {
+        if self.active_formatting_elements.is_empty() {
+            return;
+        }
+
+        let Some(Some(entry)) = self.active_formatting_elements.last() else {
+            return;
+        };
+        if self.open_elements.contains(entry) {
+            return;
+        }
+
+        unimplemented!("{:?}", entry);
     }
 
     fn handle_token_after_head(&mut self, token: Token) {
@@ -117,7 +341,7 @@ impl TreeConstructor {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
             {
-                self.insert_element(
+                self.insert(
                     DomNode::new(
                         DomNodeType::Character(c),
                         self.adjusted_current_node_namespace(),
@@ -134,7 +358,7 @@ impl TreeConstructor {
             Token::StartTag {
                 name, attributes, ..
             } if name == "body" => {
-                self.insert_element(
+                self.insert(
                     DomNode::new(
                         DomNodeType::Element { name, attributes },
                         self.adjusted_current_node_namespace(),
@@ -161,7 +385,7 @@ impl TreeConstructor {
                 self.error(ParseError::UnexpectedEndTag);
             }
             _ => {
-                self.insert_element(
+                self.insert(
                     DomNode::new(
                         DomNodeType::Element {
                             name: "body".to_string(),
@@ -182,7 +406,7 @@ impl TreeConstructor {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
             {
-                self.insert_element(
+                self.insert(
                     DomNode::new(DomNodeType::Character(c), Namespace::Html),
                     false,
                 );
@@ -198,7 +422,7 @@ impl TreeConstructor {
             Token::StartTag {
                 name, attributes, ..
             } if ["base", "basefont", "bgsound", "link"].contains(&name.as_str()) => {
-                self.insert_element(
+                self.insert(
                     DomNode::new(DomNodeType::Element { name, attributes }, Namespace::Html),
                     false,
                 );
@@ -244,14 +468,21 @@ impl TreeConstructor {
         self.arena.append_child(insert_position, domnode);
     }
 
-    fn insert_element(&mut self, node: DomNode, only_add_to_element_stack: bool) -> DomNodeIdx {
+    fn insert(&mut self, node: DomNode, only_add_to_element_stack: bool) -> DomNodeIdx {
+        let is_element = if let DomNodeType::Element { .. } = node.node_type {
+            true
+        } else {
+            false
+        };
         let adjusted_insertion_location = self.appropriate_place_for_inserting_a_node();
         let nodeidx = if !only_add_to_element_stack {
             self.arena.append_child(adjusted_insertion_location, node)
         } else {
             self.arena.push(node)
         };
-        self.open_elements.push(nodeidx);
+        if is_element {
+            self.open_elements.push(nodeidx);
+        }
         nodeidx
     }
 
@@ -271,7 +502,7 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
             Token::StartTag { name, attributes } if name == "head" => {
-                let head_idx = self.insert_element(
+                let head_idx = self.insert(
                     DomNode::new(DomNodeType::Element { name, attributes }, Namespace::Html),
                     false,
                 );
@@ -284,7 +515,7 @@ impl TreeConstructor {
                 self.error(ParseError::UnexpectedEndTag);
             }
             _ => {
-                let head_idx = self.insert_element(
+                let head_idx = self.insert(
                     DomNode::new(
                         DomNodeType::Element {
                             name: "head".to_string(),

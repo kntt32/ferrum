@@ -456,6 +456,9 @@ pub enum ParseError {
     MissingWhitespceBeforeDoctypeName,
     MissingDoctypeName,
     UnexpectedHeadTag,
+    UnclosedElementAtEof,
+    UnclosedElement,
+    UnexpectedStartTag,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
