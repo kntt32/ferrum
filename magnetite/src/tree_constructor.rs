@@ -290,23 +290,11 @@ impl TreeConstructor {
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
             {
                 self.reconstruct_the_active_formatting_elements();
-                self.insert(
-                    DomNode::new(
-                        DomNodeType::Character(c),
-                        self.adjusted_current_node_namespace(),
-                    ),
-                    false,
-                );
+                self.insert_character(c);
             }
             Token::Character(c) => {
                 self.reconstruct_the_active_formatting_elements();
-                self.insert(
-                    DomNode::new(
-                        DomNodeType::Character(c),
-                        self.adjusted_current_node_namespace(),
-                    ),
-                    false,
-                );
+                self.insert_character(c);
                 self.frameset_ok = false;
             }
             Token::Comment(text) => {
@@ -402,23 +390,13 @@ impl TreeConstructor {
                 {
                     self.open_elements.pop();
                 }
-                self.insert(
-                    DomNode::new(
-                        DomNodeType::Element { name, attributes },
-                        self.adjusted_current_node_namespace(),
-                    ),
-                    false,
-                );
+                self.insert_element(
+                    name, attributes
+                    );
             }
             Token::StartTag { name, attributes } => {
                 self.reconstruct_the_active_formatting_elements();
-                self.insert(
-                    DomNode::new(
-                        DomNodeType::Element { name, attributes },
-                        self.adjusted_current_node_namespace(),
-                    ),
-                    false,
-                );
+                self.insert_element(name, attributes);
             }
             Token::EndTag { name }
                 if ["h1", "h2", "h3", "h4", "h5", "h6"].contains(&name.as_str()) =>
@@ -447,16 +425,7 @@ impl TreeConstructor {
             Token::EndTag { name } if &name == "p" => {
                 if !self.has_an_element_in_button_scope("p") {
                     self.error(ParseError::ElementNotFoundInButtonScope);
-                    self.insert(
-                        DomNode::new(
-                            DomNodeType::Element {
-                                name: "p".to_string(),
-                                attributes: HashMap::new(),
-                            },
-                            self.adjusted_current_node_namespace(),
-                        ),
-                        false,
-                    );
+                    self.insert_element("p".to_string(), HashMap::new());
                 }
                 self.close_element("p");
             }
@@ -490,13 +459,7 @@ impl TreeConstructor {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
             {
-                self.insert(
-                    DomNode::new(
-                        DomNodeType::Character(c),
-                        self.adjusted_current_node_namespace(),
-                    ),
-                    false,
-                );
+                self.insert_character(c);
             }
             Token::Comment(text) => self.insert_comment(text),
             Token::Doctype { .. } => self.error(ParseError::UnexpectedDoctype),
@@ -507,13 +470,7 @@ impl TreeConstructor {
             Token::StartTag {
                 name, attributes, ..
             } if name == "body" => {
-                self.insert(
-                    DomNode::new(
-                        DomNodeType::Element { name, attributes },
-                        self.adjusted_current_node_namespace(),
-                    ),
-                    false,
-                );
+                self.insert_element(name, attributes);
                 self.frameset_ok = false;
                 self.switch_to(InsertionMode::InBody);
             }
@@ -534,16 +491,7 @@ impl TreeConstructor {
                 self.error(ParseError::UnexpectedEndTag);
             }
             _ => {
-                self.insert(
-                    DomNode::new(
-                        DomNodeType::Element {
-                            name: "body".to_string(),
-                            attributes: HashMap::new(),
-                        },
-                        Namespace::Html,
-                    ),
-                    false,
-                );
+                self.insert_element("body".to_string(), HashMap::new());
                 self.switch_to(InsertionMode::InBody);
                 self.handle_token(token);
             }
@@ -555,10 +503,7 @@ impl TreeConstructor {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
             {
-                self.insert(
-                    DomNode::new(DomNodeType::Character(c), Namespace::Html),
-                    false,
-                );
+                self.insert_character(c);
             }
             Token::Comment(text) => {
                 self.insert_comment(text);
@@ -569,16 +514,13 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
             Token::StartTag{ name, attributes, ..} if ["noframes", "style"].contains(&name.as_str()) => {
-                self.insert(DomNode::new(DomNodeType::Element{name, attributes}, self.adjusted_current_node_namespace()), false);
+                self.insert_element(name, attributes);
                 self.switch_to(InsertionMode::Text);
             }
             Token::StartTag {
                 name, attributes, ..
             } if ["base", "basefont", "bgsound", "link"].contains(&name.as_str()) => {
-                self.insert(
-                    DomNode::new(DomNodeType::Element { name, attributes }, Namespace::Html),
-                    false,
-                );
+                self.insert_element(name, attributes);
             }
             Token::StartTag { name, .. }
                 if [
@@ -632,6 +574,20 @@ impl TreeConstructor {
         );
     }
 
+    fn insert_element(&mut self, name: String, attributes: HashMap<String, String>) -> DomNodeIdx {
+        self.insert(
+            DomNode::new(DomNodeType::Element{name, attributes}, self.adjusted_current_node_namespace()),
+            false,
+        )
+    }
+
+    fn insert_element_with_only_add_to_element_stack(&mut self, name: String, attributes: HashMap<String, String>) -> DomNodeIdx {
+        self.insert(
+            DomNode::new(DomNodeType::Element{name, attributes}, self.adjusted_current_node_namespace()),
+            true,
+        )
+    }
+
     fn insert(&mut self, node: DomNode, only_add_to_element_stack: bool) -> DomNodeIdx {
         let is_element = if let DomNodeType::Element { .. } = node.node_type {
             true
@@ -666,9 +622,8 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
             Token::StartTag { name, attributes } if name == "head" => {
-                let head_idx = self.insert(
-                    DomNode::new(DomNodeType::Element { name, attributes }, Namespace::Html),
-                    false,
+                let head_idx = self.insert_element(
+                    name, attributes
                 );
                 self.head_element = Some(head_idx);
                 self.switch_to(InsertionMode::InHead);
@@ -679,15 +634,9 @@ impl TreeConstructor {
                 self.error(ParseError::UnexpectedEndTag);
             }
             _ => {
-                let head_idx = self.insert(
-                    DomNode::new(
-                        DomNodeType::Element {
-                            name: "head".to_string(),
-                            attributes: HashMap::new(),
-                        },
-                        Namespace::Html,
-                    ),
-                    false,
+                let head_idx = self.insert_element(
+                    "head".to_string(),
+                    HashMap::new()
                 );
                 self.head_element = Some(head_idx);
                 self.switch_to(InsertionMode::InHead);
@@ -709,25 +658,14 @@ impl TreeConstructor {
                 ()
             }
             Token::StartTag { name, attributes } if &name == "html" => {
-                let html_node =
-                    DomNode::new(DomNodeType::Element { name, attributes }, Namespace::Html);
-                let html_id = self.arena.append_child(DomArena::DOCUMENT_IDX, html_node);
-                self.open_elements.push(html_id);
+                self.insert_element(name, attributes);
                 self.switch_to(InsertionMode::BeforeHead);
             }
             Token::EndTag { name } if !["head", "body", "html", "br"].contains(&name.as_str()) => {
                 self.error(ParseError::UnexpectedEndTag);
             }
             _ => {
-                let html_node = DomNode::new(
-                    DomNodeType::Element {
-                        name: "html".to_string(),
-                        attributes: HashMap::new(),
-                    },
-                    Namespace::Html,
-                );
-                let html_id = self.arena.append_child(DomArena::DOCUMENT_IDX, html_node);
-                self.open_elements.push(html_id);
+                self.insert_element("html".to_string(), HashMap::new());
                 self.switch_to(InsertionMode::BeforeHead);
                 self.handle_token(token);
             }
