@@ -5,6 +5,7 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct TreeConstructor {
     insertion_mode: InsertionMode,
+    original_insertion_mode: Option<InsertionMode>,
     template_insertion_modes: Vec<InsertionMode>,
     open_elements: Vec<DomNodeIdx>,
     active_formatting_elements: Vec<Option<DomNodeIdx>>,
@@ -25,6 +26,7 @@ impl TreeConstructor {
     pub fn new() -> Self {
         Self {
             insertion_mode: InsertionMode::Initial,
+            original_insertion_mode: None,
             template_insertion_modes: Vec::new(),
             open_elements: vec![DomArena::DOCUMENT_IDX],
             active_formatting_elements: Vec::new(),
@@ -63,13 +65,13 @@ impl TreeConstructor {
     }
 
     fn error(&mut self, error: ParseError) {
-        if error == ParseError::UnexpectedEndTag {
-            panic!();
-        }
         self.errors.push(error);
     }
 
     fn switch_to(&mut self, insertion_mode: InsertionMode) {
+        if [InsertionMode::Text, InsertionMode::InTableText].contains(&insertion_mode) {
+            self.original_insertion_mode = Some(self.insertion_mode);
+        }
         self.insertion_mode = insertion_mode;
     }
 
@@ -87,7 +89,28 @@ impl TreeConstructor {
             InsertionMode::InBody => self.handle_token_in_body(token),
             InsertionMode::AfterBody => self.handle_token_after_body(token),
             InsertionMode::AfterAfterBody => self.handle_token_after_after_token(token),
+            InsertionMode::Text => self.handle_token_text(token),
             mode => unimplemented!("{:?}", mode),
+        }
+    }
+
+    fn handle_token_text(&mut self, token: Token) {
+        match token {
+            Token::Character(c) => {
+                self.insert_character(c);
+            },
+            Token::Eof => {
+                self.error(ParseError::EofInText);
+            },
+            Token::EndTag { name, ..} if &name == "script" => {
+                unimplemented!();
+            },
+            Token::EndTag{..} => {
+                self.open_elements.pop();
+                let original_insertion_mode = self.original_insertion_mode.take().unwrap();
+                self.switch_to(original_insertion_mode);
+            }
+            _ => (),
         }
     }
 
@@ -545,6 +568,10 @@ impl TreeConstructor {
                 self.switch_to(InsertionMode::InBody);
                 self.handle_token(token);
             }
+            Token::StartTag{ name, attributes, ..} if ["noframes", "style"].contains(&name.as_str()) => {
+                self.insert(DomNode::new(DomNodeType::Element{name, attributes}, self.adjusted_current_node_namespace()), false);
+                self.switch_to(InsertionMode::Text);
+            }
             Token::StartTag {
                 name, attributes, ..
             } if ["base", "basefont", "bgsound", "link"].contains(&name.as_str()) => {
@@ -563,6 +590,10 @@ impl TreeConstructor {
             }
             Token::StartTag { name, .. } if &name == "head" => {
                 self.error(ParseError::UnexpectedHeadTag);
+            }
+            Token::EndTag{ref name, ..} if name == "head" => {
+                self.open_elements.pop();
+                self.switch_to(InsertionMode::AfterHead);
             }
             Token::EndTag { .. } => self.error(ParseError::UnexpectedEndTag),
             _ => {
@@ -592,6 +623,13 @@ impl TreeConstructor {
             self.arena[insert_position].namespace(),
         );
         self.arena.append_child(insert_position, domnode);
+    }
+
+    fn insert_character(&mut self, c: char) {
+        self.insert(
+            DomNode::new(DomNodeType::Character(c), self.adjusted_current_node_namespace()),
+            false
+        );
     }
 
     fn insert(&mut self, node: DomNode, only_add_to_element_stack: bool) -> DomNodeIdx {

@@ -115,7 +115,90 @@ impl Tokenizer {
             State::Doctype => self.step_doctype(token_notify, error_notify),
             State::BeforeDoctypeName => self.step_before_doctype_name(token_notify, error_notify),
             State::DoctypeName => self.step_doctype_name(token_notify, error_notify),
+            State::RawText => self.step_raw_text(token_notify, error_notify),
+            State::RawTextLessThanSign => self.step_raw_text_less_than(token_notify, error_notify),
+            State::RawTextEndTagOpen => self.step_raw_text_end_tag_open(token_notify, error_notify),
             _ => unimplemented!("{:?}", self.state),
+        }
+    }
+
+    fn step_raw_text_end_tag_name(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        _error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some(mut c) if c.is_ascii_alphabetic() => {
+                c.make_ascii_lowercase();
+                self.temporary_buffer.push(c);
+            }
+            c => {
+                token_notify(Token::Character('<'));
+                token_notify(Token::Character('/'));
+                self.flush(token_notify);
+                self.unread(c);
+                self.switch_to(State::RawText);
+            }
+        }
+    }
+
+    fn step_raw_text_end_tag_open(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        _error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some(c) if c.is_ascii_alphabetic() => {
+                self.temporary_token = Some(Token::EndTag{name: String::new()});
+                self.unread(Some(c));
+                self.switch_to(State::RawTextEndTagName);
+            }
+            c => {
+                token_notify(Token::Character('<'));
+                token_notify(Token::Character('/'));
+                self.unread(c);
+                self.switch_to(State::RawText);
+            }
+        }
+    }
+
+    fn step_raw_text_less_than(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        _error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some('/') => {
+                self.temporary_buffer.clear();
+                self.switch_to(State::RawTextEndTagOpen);
+            },
+            c => {
+                token_notify(Token::Character('<'));
+                self.unread(c);
+                self.switch_to(State::RawText);
+            }
+        }
+    }
+
+    fn step_raw_text(
+        &mut self,
+        token_notify: &mut impl FnMut(Token),
+        error_notify: &mut impl FnMut(ParseError),
+    ) {
+        match self.read() {
+            Some('<') => {
+                self.switch_to(State::RawTextLessThanSign);
+            },
+            Some('\0') => {
+                error_notify(ParseError::UnexpectedNullCharacter);
+                token_notify(Token::Character('\u{fffd}'));
+            }
+            None => {
+                token_notify(Token::Eof);
+            },
+            Some(c) => {
+                token_notify(Token::Character(c));
+            }
         }
     }
 
@@ -453,6 +536,7 @@ pub enum ParseError {
     CDataInHtmlContent,
     IncorrectlyOpenedComment,
     EofInDoctype,
+    EofInText,
     MissingWhitespceBeforeDoctypeName,
     MissingDoctypeName,
     UnexpectedHeadTag,

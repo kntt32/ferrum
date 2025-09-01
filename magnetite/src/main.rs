@@ -10,6 +10,13 @@ pub fn main() {
         r#"
 <!DOCTYPE html>
 <html>
+    <head>
+        <style>
+            h1 {
+                color: blue;
+            }
+        </style>
+    </head>
     <body>
         <h1>
             Hello
@@ -33,10 +40,11 @@ pub fn main() {
             tree_constructor.adjusted_current_node_namespace()
         });
         for token in &tokens {
+            println!("{:?}", token);
             tree_constructor.handle_token(token.clone());
             if tree_constructor.errors().len() != 0 {
                 println!("{:?}", tree_constructor.errors());
-                panic!();
+                break 'a;
             }
             if token == &Token::Eof {
                 break 'a;
