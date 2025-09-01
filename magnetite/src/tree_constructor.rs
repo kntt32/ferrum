@@ -16,6 +16,7 @@ pub struct TreeConstructor {
     document: DomNodeIdx,
     saw_doctype: bool,
     frameset_ok: bool,
+    is_fragment: bool,
     position: Option<DomNodeIdx>,
     errors: Vec<ParseError>,
 }
@@ -35,9 +36,18 @@ impl TreeConstructor {
             document: DomArena::DOCUMENT_IDX,
             saw_doctype: false,
             frameset_ok: true,
+            is_fragment: false,
             position: None,
             errors: Vec::new(),
         }
+    }
+
+    pub fn dom(&self) -> &DomArena {
+        &self.arena
+    }
+
+    pub fn errors(&self) -> &[ParseError] {
+        &self.errors
     }
 
     pub fn mode(&self) -> InsertionMode {
@@ -75,7 +85,72 @@ impl TreeConstructor {
             InsertionMode::InHead => self.handle_token_in_head(token),
             InsertionMode::AfterHead => self.handle_token_after_head(token),
             InsertionMode::InBody => self.handle_token_in_body(token),
+            InsertionMode::AfterBody => self.handle_token_after_body(token),
+            InsertionMode::AfterAfterBody => self.handle_token_after_after_token(token),
             mode => unimplemented!("{:?}", mode),
+        }
+    }
+
+    fn handle_token_after_after_token(&mut self, token: Token) {
+        match token {
+            Token::Comment(text) => {
+                self.insert_comment(text);
+            }
+            Token::Doctype { .. } => {
+                self.switch_to(InsertionMode::InBody);
+                self.handle_token(token);
+            }
+
+            Token::Character(c)
+                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
+            {
+                self.switch_to(InsertionMode::InBody);
+                self.handle_token(token);
+            }
+            Token::StartTag { ref name, .. } if name == "html" => {
+                self.switch_to(InsertionMode::InBody);
+                self.handle_token(token);
+            }
+            Token::Eof => (),
+            _ => {
+                self.error(ParseError::UnexpectedTokenInAfterAfterBody);
+                self.switch_to(InsertionMode::InBody);
+                self.handle_token(token);
+            }
+        }
+    }
+
+    fn handle_token_after_body(&mut self, token: Token) {
+        match token {
+            Token::Character(c)
+                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
+            {
+                self.switch_to(InsertionMode::InBody);
+                self.handle_token(token);
+            }
+            Token::Comment(text) => {
+                self.insert_comment(text);
+            }
+            Token::Doctype { .. } => {
+                self.error(ParseError::UnexpectedDoctype);
+            }
+            Token::StartTag { ref name, .. } if name == "html" => {
+                self.switch_to(InsertionMode::InBody);
+                self.handle_token(token);
+            }
+            Token::EndTag { ref name, .. } if name == "html" => {
+                if self.is_fragment {
+                    self.error(ParseError::HtmlEndTagInFragmentParse);
+                } else {
+                    self.switch_to(InsertionMode::AfterAfterBody);
+                }
+            }
+            Token::Eof => (),
+            _ => {
+                self.error(ParseError::UnexpectedEndTag);
+                self.switch_to(InsertionMode::InBody);
+                self.handle_token(token);
+            }
         }
     }
 
@@ -271,7 +346,7 @@ impl TreeConstructor {
                 }
             }
             Token::EndTag { ref name, .. } if name == "body" => {
-                if self.opened_element("html") {
+                if !self.opened_element("html") {
                     self.error(ParseError::UnclosedElement);
                 } else {
                     for i in 1..self.open_elements.len() {

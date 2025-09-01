@@ -460,6 +460,8 @@ pub enum ParseError {
     UnclosedElement,
     UnexpectedStartTag,
     ElementNotFoundInButtonScope,
+    HtmlEndTagInFragmentParse,
+    UnexpectedTokenInAfterAfterBody,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

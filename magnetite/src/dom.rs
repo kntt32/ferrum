@@ -72,6 +72,7 @@ pub enum DomNodeType {
     },
     Comment(String),
     Character(char),
+    String(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,19 +103,6 @@ impl DomArena {
         assert!(1 < len);
         len - 1
     }
-    /*
-        pub fn get_last_element(&self, name: &str) -> Option<NodeIdx> {
-            for i in (0..self.arena.len()).rev() {
-                if let NodeType::Element { name: ref n, .. } = self.arena[i].node_type
-                    && n == name
-                {
-                    return Some(i);
-                }
-            }
-
-            None
-        }
-    */
 
     pub fn get_element(&self, name: &str) -> Option<NodeIdx> {
         for i in 0..self.arena.len() {
@@ -159,21 +147,43 @@ impl DomArena {
         self.last_node()
     }
 
-    pub fn append_child(&mut self, to: NodeIdx, node: Node) -> NodeIdx {
-        self.arena.push(node);
-        let node_idx = self.last_node();
-
+    pub fn append_child(&mut self, to: NodeIdx, mut node: Node) -> NodeIdx {
         if let Some(child_idx) = self.child(to) {
             let child_end_idx = self.siblings(child_idx).last().unwrap();
-            self[node_idx].parent = Some(to);
-            self[node_idx].prev = Some(child_end_idx);
-            self[child_end_idx].next = Some(node_idx);
+            if let NodeType::Character(c) = node.node_type
+                && let NodeType::String(ref mut s) = self[child_end_idx].node_type
+            {
+                s.push(c);
+                child_end_idx
+            } else if let NodeType::String(ref st) = node.node_type
+                && let NodeType::String(ref mut s) = self[child_end_idx].node_type
+            {
+                s.push_str(st);
+                child_end_idx
+            } else {
+                if let NodeType::Character(c) = node.node_type {
+                    node.node_type = NodeType::String(format!("{}", c));
+                }
+                self.arena.push(node);
+                let node_idx = self.last_node();
+
+                self[node_idx].parent = Some(to);
+                self[node_idx].prev = Some(child_end_idx);
+                self[child_end_idx].next = Some(node_idx);
+
+                node_idx
+            }
         } else {
+            if let NodeType::Character(c) = node.node_type {
+                node.node_type = NodeType::String(format!("{}", c));
+            }
+            self.arena.push(node);
+            let node_idx = self.last_node();
             self[to].child = Some(node_idx);
             self[node_idx].parent = Some(to);
-        }
 
-        node_idx
+            node_idx
+        }
     }
 }
 
