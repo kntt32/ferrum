@@ -98,14 +98,14 @@ impl TreeConstructor {
         match token {
             Token::Character(c) => {
                 self.insert_character(c);
-            },
+            }
             Token::Eof => {
                 self.error(ParseError::EofInText);
-            },
-            Token::EndTag { name, ..} if &name == "script" => {
+            }
+            Token::EndTag { name, .. } if &name == "script" => {
                 unimplemented!();
-            },
-            Token::EndTag{..} => {
+            }
+            Token::EndTag { .. } => {
                 self.open_elements.pop();
                 let original_insertion_mode = self.original_insertion_mode.take().unwrap();
                 self.switch_to(original_insertion_mode);
@@ -390,9 +390,7 @@ impl TreeConstructor {
                 {
                     self.open_elements.pop();
                 }
-                self.insert_element(
-                    name, attributes
-                    );
+                self.insert_element(name, attributes);
             }
             Token::StartTag { name, attributes } => {
                 self.reconstruct_the_active_formatting_elements();
@@ -513,7 +511,9 @@ impl TreeConstructor {
                 self.switch_to(InsertionMode::InBody);
                 self.handle_token(token);
             }
-            Token::StartTag{ name, attributes, ..} if ["noframes", "style"].contains(&name.as_str()) => {
+            Token::StartTag {
+                name, attributes, ..
+            } if ["noframes", "style"].contains(&name.as_str()) => {
                 self.insert_element(name, attributes);
                 self.switch_to(InsertionMode::Text);
             }
@@ -533,7 +533,7 @@ impl TreeConstructor {
             Token::StartTag { name, .. } if &name == "head" => {
                 self.error(ParseError::UnexpectedHeadTag);
             }
-            Token::EndTag{ref name, ..} if name == "head" => {
+            Token::EndTag { ref name, .. } if name == "head" => {
                 self.open_elements.pop();
                 self.switch_to(InsertionMode::AfterHead);
             }
@@ -569,21 +569,34 @@ impl TreeConstructor {
 
     fn insert_character(&mut self, c: char) {
         self.insert(
-            DomNode::new(DomNodeType::Character(c), self.adjusted_current_node_namespace()),
-            false
+            DomNode::new(
+                DomNodeType::Character(c),
+                self.adjusted_current_node_namespace(),
+            ),
+            false,
         );
     }
 
     fn insert_element(&mut self, name: String, attributes: HashMap<String, String>) -> DomNodeIdx {
         self.insert(
-            DomNode::new(DomNodeType::Element{name, attributes}, self.adjusted_current_node_namespace()),
+            DomNode::new(
+                DomNodeType::Element { name, attributes },
+                self.adjusted_current_node_namespace(),
+            ),
             false,
         )
     }
 
-    fn insert_element_with_only_add_to_element_stack(&mut self, name: String, attributes: HashMap<String, String>) -> DomNodeIdx {
+    fn insert_element_with_only_add_to_element_stack(
+        &mut self,
+        name: String,
+        attributes: HashMap<String, String>,
+    ) -> DomNodeIdx {
         self.insert(
-            DomNode::new(DomNodeType::Element{name, attributes}, self.adjusted_current_node_namespace()),
+            DomNode::new(
+                DomNodeType::Element { name, attributes },
+                self.adjusted_current_node_namespace(),
+            ),
             true,
         )
     }
@@ -622,9 +635,7 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
             Token::StartTag { name, attributes } if name == "head" => {
-                let head_idx = self.insert_element(
-                    name, attributes
-                );
+                let head_idx = self.insert_element(name, attributes);
                 self.head_element = Some(head_idx);
                 self.switch_to(InsertionMode::InHead);
             }
@@ -634,10 +645,7 @@ impl TreeConstructor {
                 self.error(ParseError::UnexpectedEndTag);
             }
             _ => {
-                let head_idx = self.insert_element(
-                    "head".to_string(),
-                    HashMap::new()
-                );
+                let head_idx = self.insert_element("head".to_string(), HashMap::new());
                 self.head_element = Some(head_idx);
                 self.switch_to(InsertionMode::InHead);
                 self.handle_token(token);

@@ -149,7 +149,9 @@ impl Tokenizer {
     ) {
         match self.read() {
             Some(c) if c.is_ascii_alphabetic() => {
-                self.temporary_token = Some(Token::EndTag{name: String::new()});
+                self.temporary_token = Some(Token::EndTag {
+                    name: String::new(),
+                });
                 self.unread(Some(c));
                 self.switch_to(State::RawTextEndTagName);
             }
@@ -171,7 +173,7 @@ impl Tokenizer {
             Some('/') => {
                 self.temporary_buffer.clear();
                 self.switch_to(State::RawTextEndTagOpen);
-            },
+            }
             c => {
                 token_notify(Token::Character('<'));
                 self.unread(c);
@@ -188,14 +190,14 @@ impl Tokenizer {
         match self.read() {
             Some('<') => {
                 self.switch_to(State::RawTextLessThanSign);
-            },
+            }
             Some('\0') => {
                 error_notify(ParseError::UnexpectedNullCharacter);
                 token_notify(Token::Character('\u{fffd}'));
             }
             None => {
                 token_notify(Token::Eof);
-            },
+            }
             Some(c) => {
                 token_notify(Token::Character(c));
             }

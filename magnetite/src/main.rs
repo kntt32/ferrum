@@ -1,8 +1,9 @@
-use magnetite::byte_stream_decoder::ByteStreamDecoder;
-use magnetite::input_stream_preprocessor::InputStreamPreprocessor;
-use magnetite::tokenizer::Token;
-use magnetite::tokenizer::Tokenizer;
-use magnetite::tree_constructor::*;
+use html::byte_stream_decoder::ByteStreamDecoder;
+use html::input_stream_preprocessor::InputStreamPreprocessor;
+use html::tokenizer::Token;
+use html::tokenizer::Tokenizer;
+use html::tree_constructor::*;
+use magnetite::html;
 use std::io::Cursor;
 
 pub fn main() {
