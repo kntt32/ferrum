@@ -514,11 +514,15 @@ impl TreeConstructor {
         self.original_insertion_mode = Some(self.insertion_mode);
     }
 
-    fn parse_generic_raw_text_element(&mut self, name: String, attributes: HashMap<String, String>) -> Option<TokenizerState> {
+    fn parse_generic_raw_text_element(
+        &mut self,
+        name: String,
+        attributes: HashMap<String, String>,
+    ) -> Option<TokenizerState> {
         self.insert_element(name, attributes);
         self.set_original_insertion_mode();
         self.switch_to(InsertionMode::Text);
-        
+
         Some(TokenizerState::RawText)
     }
 
@@ -537,7 +541,7 @@ impl TreeConstructor {
             Token::Doctype { .. } => {
                 self.error(ParseError::UnexpectedDoctype);
                 None
-            },
+            }
             Token::StartTag { ref name, .. } if name == "html" => {
                 self.switch_to(InsertionMode::InBody);
                 self.handle_token(token);
@@ -574,7 +578,7 @@ impl TreeConstructor {
             Token::EndTag { .. } => {
                 self.error(ParseError::UnexpectedEndTag);
                 None
-            },
+            }
             _ => {
                 self.open_elements.pop();
                 self.switch_to(InsertionMode::AfterHead);

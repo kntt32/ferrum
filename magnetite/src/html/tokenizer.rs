@@ -39,7 +39,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn emit(&mut self, token: Token) {
-        if let Token::StartTag{ref name, ..} = token {
+        if let Token::StartTag { ref name, .. } = token {
             self.appropriate_end_tag_name = Some(name.to_string());
         }
         if let Some(state) = self.tree_constructor.handle_token(token) {
@@ -152,7 +152,10 @@ impl<'a> Tokenizer<'a> {
 
     fn step_raw_text_end_tag_name(&mut self) {
         match self.read() {
-            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) && Some(&self.temporary_buffer) == self.appropriate_end_tag_name.as_ref() => {
+            Some(c)
+                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c)
+                    && Some(&self.temporary_buffer) == self.appropriate_end_tag_name.as_ref() =>
+            {
                 self.switch_to(State::BeforeAttributeName);
             }
             Some('/') if Some(&self.temporary_buffer) == self.appropriate_end_tag_name.as_ref() => {
