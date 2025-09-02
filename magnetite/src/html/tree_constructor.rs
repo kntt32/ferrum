@@ -64,6 +64,10 @@ impl TreeConstructor {
         self.current_node()
     }
 
+    pub fn handle_error(&mut self, error: ParseError) {
+        self.errors.push(error);
+    }
+
     fn error(&mut self, error: ParseError) {
         self.errors.push(error);
     }
@@ -79,7 +83,7 @@ impl TreeConstructor {
         self.arena[self.adjusted_current_node()].namespace()
     }
 
-    pub fn handle_token(&mut self, token: Token) {
+    pub fn handle_token(&mut self, token: Token) -> Option<TokenizerState> {
         match self.insertion_mode {
             InsertionMode::Initial => self.handle_token_initial(token),
             InsertionMode::BeforeHtml => self.handle_token_before_html(token),
@@ -94,7 +98,7 @@ impl TreeConstructor {
         }
     }
 
-    fn handle_token_text(&mut self, token: Token) {
+    fn handle_token_text(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c) => {
                 self.insert_character(c);
@@ -112,9 +116,10 @@ impl TreeConstructor {
             }
             _ => (),
         }
+        None
     }
 
-    fn handle_token_after_after_token(&mut self, token: Token) {
+    fn handle_token_after_after_token(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Comment(text) => {
                 self.insert_comment(text);
@@ -141,9 +146,10 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
         }
+        None
     }
 
-    fn handle_token_after_body(&mut self, token: Token) {
+    fn handle_token_after_body(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
@@ -175,9 +181,10 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
         }
+        None
     }
 
-    fn handle_token_initial(&mut self, token: Token) {
+    fn handle_token_initial(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
@@ -207,6 +214,7 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
         }
+        None
     }
 
     fn opened_element(&self, name: &str) -> bool {
@@ -283,7 +291,7 @@ impl TreeConstructor {
         }
     }
 
-    fn handle_token_in_body(&mut self, token: Token) {
+    fn handle_token_in_body(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character('\0') => self.error(ParseError::UnexpectedNullCharacter),
             Token::Character(c)
@@ -435,6 +443,7 @@ impl TreeConstructor {
                 }
             }
         }
+        None
     }
 
     fn reconstruct_the_active_formatting_elements(&mut self) {
@@ -452,7 +461,7 @@ impl TreeConstructor {
         unimplemented!("{:?}", entry);
     }
 
-    fn handle_token_after_head(&mut self, token: Token) {
+    fn handle_token_after_head(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
@@ -494,9 +503,10 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
         }
+        None
     }
 
-    fn handle_token_in_head(&mut self, token: Token) {
+    fn handle_token_in_head(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
@@ -544,6 +554,7 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
         }
+        None
     }
 
     fn appropriate_place_for_inserting_a_node(&self) -> DomNodeIdx {
@@ -619,7 +630,7 @@ impl TreeConstructor {
         nodeidx
     }
 
-    fn handle_token_before_head(&mut self, token: Token) {
+    fn handle_token_before_head(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
@@ -651,9 +662,10 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
         }
+        None
     }
 
-    fn handle_token_before_html(&mut self, token: Token) {
+    fn handle_token_before_html(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Doctype { .. } => self.error(ParseError::UnexpectedDoctype),
             Token::Comment(text) => {
@@ -678,6 +690,7 @@ impl TreeConstructor {
                 self.handle_token(token);
             }
         }
+        None
     }
 }
 

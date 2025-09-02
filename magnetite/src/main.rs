@@ -30,28 +30,13 @@ pub fn main() {
     );
     let byte_stream_decoder = ByteStreamDecoder::new(stream);
     let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
-    let mut tokenizer = Tokenizer::new(input_stream_preprocessor);
     let mut tree_constructor = TreeConstructor::new();
+    let mut tokenizer = Tokenizer::new(input_stream_preprocessor, &mut tree_constructor);
 
-    let mut tokens = Vec::new();
-    let mut errors = Vec::new();
-
-    'a: loop {
-        tokenizer.step(&mut |t| tokens.push(t), &mut |e| errors.push(e), &|| {
-            tree_constructor.adjusted_current_node_namespace()
-        });
-        for token in &tokens {
-            println!("{:?}", token);
-            tree_constructor.handle_token(token.clone());
-            if tree_constructor.errors().len() != 0 {
-                println!("{:?}", tree_constructor.errors());
-                break 'a;
-            }
-            if token == &Token::Eof {
-                break 'a;
-            }
+    loop {
+        if tokenizer.step().is_none() {
+            break;
         }
-        tokens.clear();
     }
 
     println!("{:?}", tree_constructor.dom());
