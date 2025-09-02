@@ -14,6 +14,7 @@ pub struct Tokenizer<'a> {
     temporary_buffer: String,
     temporary_token: Option<Token>,
     tree_constructor: &'a mut TreeConstructor,
+    appropriate_end_tag_name: Option<String>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -29,6 +30,7 @@ impl<'a> Tokenizer<'a> {
             temporary_buffer: String::new(),
             temporary_token: None,
             tree_constructor,
+            appropriate_end_tag_name: None,
         }
     }
 
@@ -37,6 +39,9 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn emit(&mut self, token: Token) {
+        if let Token::StartTag{ref name, ..} = token {
+            self.appropriate_end_tag_name = Some(name.to_string());
+        }
         if let Some(state) = self.tree_constructor.handle_token(token) {
             self.switch_to(state);
         }
@@ -138,6 +143,7 @@ impl<'a> Tokenizer<'a> {
             State::RawText => self.step_raw_text(),
             State::RawTextLessThanSign => self.step_raw_text_less_than(),
             State::RawTextEndTagOpen => self.step_raw_text_end_tag_open(),
+            State::RawTextEndTagName => self.step_raw_text_end_tag_name(),
             _ => unimplemented!("{:?}", self.state),
         }
 
@@ -146,6 +152,19 @@ impl<'a> Tokenizer<'a> {
 
     fn step_raw_text_end_tag_name(&mut self) {
         match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) && Some(&self.temporary_buffer) == self.appropriate_end_tag_name.as_ref() => {
+                self.switch_to(State::BeforeAttributeName);
+            }
+            Some('/') if Some(&self.temporary_buffer) == self.appropriate_end_tag_name.as_ref() => {
+                self.switch_to(State::SelfClosingStartTag);
+            }
+            Some('>') if Some(&self.temporary_buffer) == self.appropriate_end_tag_name.as_ref() => {
+                self.switch_to(State::Data);
+                let name = mem::take(&mut self.temporary_buffer);
+                self.emit(Token::EndTag { name });
+                self.appropriate_end_tag_name = None;
+                self.switch_to(State::Data);
+            }
             Some(mut c) if c.is_ascii_alphabetic() => {
                 c.make_ascii_lowercase();
                 self.temporary_buffer.push(c);
@@ -442,8 +461,8 @@ impl<'a> Tokenizer<'a> {
             Some('\u{002f}') => self.switch_to(State::SelfClosingStartTag),
             Some('\u{003e}') => {
                 let token = self.temporary_token.take().unwrap();
-                self.emit(token);
                 self.switch_to(State::Data);
+                self.emit(token);
             }
             Some('\0') => {
                 self.error(ParseError::UnexpectedNullCharacter);

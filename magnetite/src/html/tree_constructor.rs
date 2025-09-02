@@ -79,6 +79,11 @@ impl TreeConstructor {
         self.insertion_mode = insertion_mode;
     }
 
+    fn switch_to_original_insertion_mode(&mut self) {
+        let original_insertion_mode = self.original_insertion_mode.take().unwrap();
+        self.switch_to(original_insertion_mode);
+    }
+
     pub fn adjusted_current_node_namespace(&self) -> Namespace {
         self.arena[self.adjusted_current_node()].namespace()
     }
@@ -111,8 +116,7 @@ impl TreeConstructor {
             }
             Token::EndTag { .. } => {
                 self.open_elements.pop();
-                let original_insertion_mode = self.original_insertion_mode.take().unwrap();
-                self.switch_to(original_insertion_mode);
+                self.switch_to_original_insertion_mode();
             }
             _ => (),
         }
@@ -506,31 +510,49 @@ impl TreeConstructor {
         None
     }
 
+    fn set_original_insertion_mode(&mut self) {
+        self.original_insertion_mode = Some(self.insertion_mode);
+    }
+
+    fn parse_generic_raw_text_element(&mut self, name: String, attributes: HashMap<String, String>) -> Option<TokenizerState> {
+        self.insert_element(name, attributes);
+        self.set_original_insertion_mode();
+        self.switch_to(InsertionMode::Text);
+        
+        Some(TokenizerState::RawText)
+    }
+
     fn handle_token_in_head(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
             {
                 self.insert_character(c);
+                None
             }
             Token::Comment(text) => {
                 self.insert_comment(text);
+                None
             }
-            Token::Doctype { .. } => self.error(ParseError::UnexpectedDoctype),
+            Token::Doctype { .. } => {
+                self.error(ParseError::UnexpectedDoctype);
+                None
+            },
             Token::StartTag { ref name, .. } if name == "html" => {
                 self.switch_to(InsertionMode::InBody);
                 self.handle_token(token);
+                None
             }
             Token::StartTag {
                 name, attributes, ..
             } if ["noframes", "style"].contains(&name.as_str()) => {
-                self.insert_element(name, attributes);
-                self.switch_to(InsertionMode::Text);
+                self.parse_generic_raw_text_element(name, attributes)
             }
             Token::StartTag {
                 name, attributes, ..
             } if ["base", "basefont", "bgsound", "link"].contains(&name.as_str()) => {
                 self.insert_element(name, attributes);
+                None
             }
             Token::StartTag { name, .. }
                 if [
@@ -538,23 +560,28 @@ impl TreeConstructor {
                 ]
                 .contains(&name.as_str()) =>
             {
-                unimplemented!("{:?}", name)
+                unimplemented!("{:?}", name);
             }
             Token::StartTag { name, .. } if &name == "head" => {
                 self.error(ParseError::UnexpectedHeadTag);
+                None
             }
             Token::EndTag { ref name, .. } if name == "head" => {
                 self.open_elements.pop();
                 self.switch_to(InsertionMode::AfterHead);
+                None
             }
-            Token::EndTag { .. } => self.error(ParseError::UnexpectedEndTag),
+            Token::EndTag { .. } => {
+                self.error(ParseError::UnexpectedEndTag);
+                None
+            },
             _ => {
                 self.open_elements.pop();
                 self.switch_to(InsertionMode::AfterHead);
                 self.handle_token(token);
+                None
             }
         }
-        None
     }
 
     fn appropriate_place_for_inserting_a_node(&self) -> DomNodeIdx {

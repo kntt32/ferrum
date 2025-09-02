@@ -1,6 +1,5 @@
 use html::byte_stream_decoder::ByteStreamDecoder;
 use html::input_stream_preprocessor::InputStreamPreprocessor;
-use html::tokenizer::Token;
 use html::tokenizer::Tokenizer;
 use html::tree_constructor::*;
 use magnetite::html;
