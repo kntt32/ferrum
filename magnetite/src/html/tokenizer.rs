@@ -81,9 +81,9 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn unread(&mut self, c: Option<char>) {
-        c.map(|c| {
+        if let Some(c) = c {
             self.string_index -= c.len_utf8();
-        });
+        }
     }
 
     fn look_str(&self, len: usize) -> Option<&str> {

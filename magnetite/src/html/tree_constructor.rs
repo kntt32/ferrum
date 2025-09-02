@@ -22,6 +22,12 @@ pub struct TreeConstructor {
     errors: Vec<ParseError>,
 }
 
+impl Default for TreeConstructor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TreeConstructor {
     pub fn new() -> Self {
         Self {
@@ -191,10 +197,7 @@ impl TreeConstructor {
     fn handle_token_initial(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
-                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
-            {
-                ()
-            }
+                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) => {}
             Token::Doctype { name, .. } => {
                 self.saw_doctype = true;
 
@@ -316,16 +319,14 @@ impl TreeConstructor {
             Token::StartTag { name, attributes } if &name == "html" => {
                 self.error(ParseError::UnexpectedStartTag);
                 if let Some(html_idx) = self.arena.get_child_element(DomArena::DOCUMENT_IDX, "html")
-                {
-                    if let DomNodeType::Element {
+                    && let DomNodeType::Element {
                         attributes: ref mut real_attributes,
                         ..
                     } = self.arena[html_idx].node_type
-                    {
-                        for attribute in attributes {
-                            if !real_attributes.contains_key(&attribute.0) {
-                                real_attributes.insert(attribute.0.clone(), attribute.1.clone());
-                            }
+                {
+                    for attribute in attributes {
+                        if !real_attributes.contains_key(&attribute.0) {
+                            real_attributes.insert(attribute.0.clone(), attribute.1.clone());
                         }
                     }
                 }
@@ -644,11 +645,7 @@ impl TreeConstructor {
     }
 
     fn insert(&mut self, node: DomNode, only_add_to_element_stack: bool) -> DomNodeIdx {
-        let is_element = if let DomNodeType::Element { .. } = node.node_type {
-            true
-        } else {
-            false
-        };
+        let is_element = matches!(node.node_type, DomNodeType::Element { .. });
         let adjusted_insertion_location = self.appropriate_place_for_inserting_a_node();
         let nodeidx = if !only_add_to_element_stack {
             self.arena.append_child(adjusted_insertion_location, node)
@@ -664,10 +661,7 @@ impl TreeConstructor {
     fn handle_token_before_head(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
-                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
-            {
-                ()
-            }
+                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) => {}
             Token::Comment(text) => {
                 self.insert_comment(text);
             }
@@ -704,10 +698,7 @@ impl TreeConstructor {
                 self.arena.append_child(self.document, node);
             }
             Token::Character(c)
-                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) =>
-            {
-                ()
-            }
+                if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) => {}
             Token::StartTag { name, attributes } if &name == "html" => {
                 self.insert_element(name, attributes);
                 self.switch_to(InsertionMode::BeforeHead);

@@ -14,6 +14,12 @@ pub struct DomArena {
     arena: Vec<Node>,
 }
 
+impl Default for DomArena {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DomNode {
     namespace: Namespace,

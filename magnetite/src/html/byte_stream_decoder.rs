@@ -12,9 +12,7 @@ impl<S: Read> ByteStreamDecoder<S> {
 
     pub fn decode(&mut self) -> Result<String, IoError> {
         let mut vec = Vec::new();
-        if let Err(e) = self.stream.read_to_end(&mut vec) {
-            return Err(e);
-        }
+        self.stream.read_to_end(&mut vec)?;
 
         let string_cow = String::from_utf8_lossy(&vec);
         Ok(string_cow.into_owned())
