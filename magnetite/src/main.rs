@@ -1,11 +1,43 @@
+use css::tokenizer::Token as CssToken;
+use css::tokenizer::Tokenizer as CssTokenizer;
 use html::byte_stream_decoder::ByteStreamDecoder;
 use html::input_stream_preprocessor::InputStreamPreprocessor;
 use html::tokenizer::Tokenizer;
 use html::tree_constructor::*;
+use magnetite::css;
 use magnetite::html;
 use std::io::Cursor;
 
-pub fn main() {
+fn main() {
+    css_demo();
+}
+
+#[allow(unused)]
+fn css_demo() {
+    let s = r#"
+@import url(https://example.com/style.css);
+
+@import url("https://example.com/quoted.css");
+@import url('https://example.com/quoted-single.css');
+
+@import url(   https://example.com/space.css   );
+
+@import url("https://example.com/bad.css');
+
+@import url();
+
+@import url(https://example.com/comment.css); /* コメント */
+        "#;
+
+    let mut tokenizer = CssTokenizer::new(s);
+    while let Some(t) = tokenizer.step() {
+        println!("{:?}", t);
+    }
+    println!("{:?}", tokenizer);
+}
+
+#[allow(unused)]
+fn html_demo() {
     let stream = Cursor::new(
         r#"
 <!DOCTYPE html>
