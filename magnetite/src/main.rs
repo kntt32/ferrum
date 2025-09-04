@@ -4,29 +4,41 @@ use html::byte_stream_decoder::ByteStreamDecoder;
 use html::input_stream_preprocessor::InputStreamPreprocessor;
 use html::tokenizer::Tokenizer;
 use html::tree_constructor::*;
+use magnetite::arena::*;
 use magnetite::css;
 use magnetite::html;
 use std::io::Cursor;
 
 fn main() {
-    css_demo();
+    arena_demo();
+}
+
+#[allow(unused)]
+fn arena_demo() {
+    let mut arena: Arena<i32> = Arena::new();
+    let root = arena.push(1);
+    let child1 = arena.insert_child(root, 2);
+    let child2 = arena.insert_child(root, 3);
+    arena.insert_child(root, 4);
+    arena.insert_child(child2, 5);
+    println!("{:?}", arena);
+    arena.unlink(child2);
+    println!("{:?}", arena);
+    arena.unlink(child1);
+    println!("{:?}", arena);
 }
 
 #[allow(unused)]
 fn css_demo() {
-    let s = r#"
-@import url(https://example.com/style.css);
+    let s = r#"/* コメント */
+@import url("https://example.com/style.css");
 
-@import url("https://example.com/quoted.css");
-@import url('https://example.com/quoted-single.css');
-
-@import url(   https://example.com/space.css   );
-
-@import url("https://example.com/bad.css');
-
-@import url();
-
-@import url(https://example.com/comment.css); /* コメント */
+:root {
+    --main-color: #ff00ff;
+    --font-size: 16px;
+    width: calc(100% - 20px);
+    height: 50vh;
+}
         "#;
 
     let mut tokenizer = CssTokenizer::new(s);
