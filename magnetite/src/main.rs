@@ -10,7 +10,7 @@ use magnetite::html;
 use std::io::Cursor;
 
 fn main() {
-    arena_demo();
+    html_demo();
 }
 
 #[allow(unused)]
@@ -71,6 +71,7 @@ fn html_demo() {
     </body>
 </html>"#,
     );
+
     let byte_stream_decoder = ByteStreamDecoder::new(stream);
     let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
     let mut tree_constructor = TreeConstructor::new();

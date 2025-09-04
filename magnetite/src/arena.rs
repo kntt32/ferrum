@@ -5,7 +5,7 @@ use ops::IndexMut;
 use std::ops;
 use std::slice::SliceIndex;
 
-type NodeId = usize;
+pub type NodeId = usize;
 
 #[derive(Clone, Debug)]
 pub struct Arena<T> {
@@ -61,6 +61,7 @@ impl<T> Arena<T> {
         } else {
             let child_id = self.push(value);
             self[id].child = Some(child_id);
+            self[child_id].parent = Some(id);
             child_id
         }
     }

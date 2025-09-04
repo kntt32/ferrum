@@ -1,19 +1,112 @@
+use crate::arena::Arena;
+use crate::arena::ArenaNode;
+pub use crate::arena::NodeId;
 use std::collections::HashMap;
 use std::iter::Iterator;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::ops::Index;
 use std::ops::IndexMut;
+use std::slice::SliceIndex;
 use std::str::FromStr;
 
-pub type DomNodeIdx = usize;
-type NodeIdx = DomNodeIdx;
 type Node = DomNode;
 type NodeType = DomNodeType;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct DomArena {
-    arena: Vec<Node>,
+    arena: Arena<Node>,
 }
 
+impl DomArena {
+    pub const DOCUMENT_IDX: usize = 0;
+
+    pub fn new() -> Self {
+        let mut arena = Arena::new();
+        arena.push(Node::DOCUMENT);
+        Self { arena }
+    }
+
+    pub fn get_child_element(&mut self, id: NodeId, name: &str) -> Option<NodeId> {
+        for child in self.arena.children(id) {
+            if let NodeType::Element {
+                name: ref node_name,
+                ..
+            } = self[child].node_type
+                && node_name == name
+            {
+                return Some(child);
+            }
+        }
+        None
+    }
+
+    pub fn insert_child(&mut self, id: NodeId, mut node: Node) -> NodeId {
+        if let Some(last_child) = self.arena.children(id).last() {
+            self.insert_after(last_child, node)
+        } else {
+            if let NodeType::Character(c) = node.node_type {
+                node.node_type = NodeType::String(format!("{}", c));
+            }
+            self.arena.insert_child(id, node)
+        }
+    }
+
+    pub fn insert_after(&mut self, at: NodeId, mut node: Node) -> NodeId {
+        if let NodeType::String(ref mut s) = self.arena[at].node_type
+            && let NodeType::Character(c) = node.node_type
+        {
+            s.push(c);
+            at
+        } else if let NodeType::String(ref mut s) = self.arena[at].node_type
+            && let NodeType::String(ref s2) = node.node_type
+        {
+            s.push_str(s2.as_str());
+            at
+        } else {
+            if let NodeType::Character(c) = node.node_type {
+                node.node_type = NodeType::String(format!("{}", c));
+            }
+            self.arena.insert_after(at, node)
+        }
+    }
+
+    pub fn push(&mut self, mut node: Node) -> NodeId {
+        if let NodeType::Character(c) = node.node_type {
+            node.node_type = NodeType::String(format!("{}", c));
+        }
+        self.arena.push(node)
+    }
+}
+
+impl<I: SliceIndex<[ArenaNode<Node>]>> Index<I> for DomArena {
+    type Output = <I as SliceIndex<[ArenaNode<Node>]>>::Output;
+
+    fn index(&self, index: I) -> &Self::Output {
+        &self.arena[index]
+    }
+}
+
+impl<I: SliceIndex<[ArenaNode<Node>]>> IndexMut<I> for DomArena {
+    fn index_mut(&mut self, index: I) -> &mut Self::Output {
+        &mut self.arena[index]
+    }
+}
+/*
+impl Deref for DomArena {
+    type Target = Arena<Node>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.arena
+    }
+}
+
+impl DerefMut for DomArena {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.arena
+    }
+}
+*/
 impl Default for DomArena {
     fn default() -> Self {
         Self::new()
@@ -24,10 +117,6 @@ impl Default for DomArena {
 pub struct DomNode {
     namespace: Namespace,
     pub node_type: NodeType,
-    parent: Option<NodeIdx>,
-    child: Option<NodeIdx>,
-    prev: Option<NodeIdx>,
-    next: Option<NodeIdx>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,152 +170,16 @@ pub enum DomNodeType {
     String(String),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Siblings<'a> {
-    dom_arena: &'a DomArena,
-    node_index: Option<NodeIdx>,
-}
-
-impl DomArena {
-    pub const DOCUMENT_IDX: usize = 0;
-
-    pub fn new() -> Self {
-        Self {
-            arena: vec![Node::document()],
-        }
-    }
-
-    pub fn get(&self, idx: NodeIdx) -> &DomNode {
-        &self.arena[idx]
-    }
-
-    pub fn get_mut(&mut self, idx: NodeIdx) -> &mut DomNode {
-        &mut self.arena[idx]
-    }
-
-    pub fn last_node(&self) -> NodeIdx {
-        let len = self.arena.len();
-        assert!(1 < len);
-        len - 1
-    }
-
-    pub fn get_element(&self, name: &str) -> Option<NodeIdx> {
-        for i in 0..self.arena.len() {
-            if let DomNodeType::Element { name: ref s, .. } = self[i].node_type
-                && s == name
-            {
-                return Some(i);
-            }
-        }
-        None
-    }
-
-    pub fn get_child_element(&self, parent: NodeIdx, name: &str) -> Option<NodeIdx> {
-        let child = self.child(parent)?;
-        for element in self.siblings(child) {
-            if let DomNodeType::Element { name: ref s, .. } = self[element].node_type
-                && s == name
-            {
-                return Some(element);
-            }
-        }
-        None
-    }
-
-    pub fn parent(&self, node: NodeIdx) -> Option<NodeIdx> {
-        self.arena[node].parent
-    }
-
-    pub fn child(&self, node: NodeIdx) -> Option<NodeIdx> {
-        self.arena[node].child
-    }
-
-    pub fn siblings(&self, node: NodeIdx) -> Siblings<'_> {
-        Siblings {
-            dom_arena: self,
-            node_index: Some(node),
-        }
-    }
-
-    pub fn push(&mut self, node: Node) -> NodeIdx {
-        self.arena.push(node);
-        self.last_node()
-    }
-
-    pub fn append_child(&mut self, to: NodeIdx, mut node: Node) -> NodeIdx {
-        if let Some(child_idx) = self.child(to) {
-            let child_end_idx = self.siblings(child_idx).last().unwrap();
-            if let NodeType::Character(c) = node.node_type
-                && let NodeType::String(ref mut s) = self[child_end_idx].node_type
-            {
-                s.push(c);
-                child_end_idx
-            } else if let NodeType::String(ref st) = node.node_type
-                && let NodeType::String(ref mut s) = self[child_end_idx].node_type
-            {
-                s.push_str(st);
-                child_end_idx
-            } else {
-                if let NodeType::Character(c) = node.node_type {
-                    node.node_type = NodeType::String(format!("{}", c));
-                }
-                self.arena.push(node);
-                let node_idx = self.last_node();
-
-                self[node_idx].parent = Some(to);
-                self[node_idx].prev = Some(child_end_idx);
-                self[child_end_idx].next = Some(node_idx);
-
-                node_idx
-            }
-        } else {
-            if let NodeType::Character(c) = node.node_type {
-                node.node_type = NodeType::String(format!("{}", c));
-            }
-            self.arena.push(node);
-            let node_idx = self.last_node();
-            self[to].child = Some(node_idx);
-            self[node_idx].parent = Some(to);
-
-            node_idx
-        }
-    }
-}
-
-impl Index<NodeIdx> for DomArena {
-    type Output = Node;
-
-    fn index(&self, index: NodeIdx) -> &Node {
-        self.get(index)
-    }
-}
-
-impl IndexMut<NodeIdx> for DomArena {
-    fn index_mut(&mut self, index: NodeIdx) -> &mut Node {
-        self.get_mut(index)
-    }
-}
-
 impl DomNode {
+    pub const DOCUMENT: Self = Self {
+        namespace: Namespace::Html,
+        node_type: NodeType::Document,
+    };
+
     pub fn new(node_type: DomNodeType, namespace: Namespace) -> Self {
         Self {
-            parent: None,
-            child: None,
             namespace,
             node_type,
-            prev: None,
-            next: None,
-        }
-    }
-
-    pub fn document() -> Self {
-        Self {
-            parent: None,
-            child: None,
-            namespace: Namespace::Html,
-            node_type: NodeType::Document,
-            prev: None,
-            next: None,
         }
     }
 
@@ -236,15 +189,5 @@ impl DomNode {
 
     pub fn node_type(&self) -> &NodeType {
         &self.node_type
-    }
-}
-
-impl<'a> Iterator for Siblings<'a> {
-    type Item = NodeIdx;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let node_index = self.node_index?;
-        self.node_index = self.dom_arena.get(node_index).next;
-        Some(node_index)
     }
 }

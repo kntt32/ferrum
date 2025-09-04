@@ -7,18 +7,18 @@ pub struct TreeConstructor {
     insertion_mode: InsertionMode,
     original_insertion_mode: Option<InsertionMode>,
     template_insertion_modes: Vec<InsertionMode>,
-    open_elements: Vec<DomNodeIdx>,
-    active_formatting_elements: Vec<Option<DomNodeIdx>>,
-    head_element: Option<DomNodeIdx>,
-    form_element: Option<DomNodeIdx>,
+    open_elements: Vec<NodeId>,
+    active_formatting_elements: Vec<Option<NodeId>>,
+    head_element: Option<NodeId>,
+    form_element: Option<NodeId>,
     quirks_mode: QuirksMode,
     pending_table_characters: String,
     arena: DomArena,
-    document: DomNodeIdx,
+    document: NodeId,
     saw_doctype: bool,
     frameset_ok: bool,
     is_fragment: bool,
-    position: Option<DomNodeIdx>,
+    position: Option<NodeId>,
     errors: Vec<ParseError>,
 }
 
@@ -62,11 +62,11 @@ impl TreeConstructor {
         self.insertion_mode
     }
 
-    fn current_node(&self) -> DomNodeIdx {
+    fn current_node(&self) -> NodeId {
         *self.open_elements.last().unwrap()
     }
 
-    fn adjusted_current_node(&self) -> DomNodeIdx {
+    fn adjusted_current_node(&self) -> NodeId {
         self.current_node()
     }
 
@@ -211,8 +211,7 @@ impl TreeConstructor {
                 self.switch_to(InsertionMode::BeforeHtml);
             }
             Token::Comment(text) => {
-                let node = DomNode::new(DomNodeType::Comment(text), Namespace::Html);
-                self.arena.append_child(self.document, node);
+                self.insert_comment(text);
             }
             _ => {
                 self.error(ParseError::ExpectedDoctypeButGotSomethingElse);
@@ -589,11 +588,11 @@ impl TreeConstructor {
         }
     }
 
-    fn appropriate_place_for_inserting_a_node(&self) -> DomNodeIdx {
+    fn appropriate_place_for_inserting_a_node(&self) -> NodeId {
         self.current_node()
     }
 
-    fn insert_position(&self) -> DomNodeIdx {
+    fn insert_position(&self) -> NodeId {
         if let Some(position) = self.position {
             position
         } else {
@@ -607,7 +606,7 @@ impl TreeConstructor {
             DomNodeType::Comment(text),
             self.arena[insert_position].namespace(),
         );
-        self.arena.append_child(insert_position, domnode);
+        self.arena.insert_child(insert_position, domnode);
     }
 
     fn insert_character(&mut self, c: char) {
@@ -620,7 +619,7 @@ impl TreeConstructor {
         );
     }
 
-    fn insert_element(&mut self, name: String, attributes: HashMap<String, String>) -> DomNodeIdx {
+    fn insert_element(&mut self, name: String, attributes: HashMap<String, String>) -> NodeId {
         self.insert(
             DomNode::new(
                 DomNodeType::Element { name, attributes },
@@ -634,7 +633,7 @@ impl TreeConstructor {
         &mut self,
         name: String,
         attributes: HashMap<String, String>,
-    ) -> DomNodeIdx {
+    ) -> NodeId {
         self.insert(
             DomNode::new(
                 DomNodeType::Element { name, attributes },
@@ -644,11 +643,11 @@ impl TreeConstructor {
         )
     }
 
-    fn insert(&mut self, node: DomNode, only_add_to_element_stack: bool) -> DomNodeIdx {
+    fn insert(&mut self, node: DomNode, only_add_to_element_stack: bool) -> NodeId {
         let is_element = matches!(node.node_type, DomNodeType::Element { .. });
         let adjusted_insertion_location = self.appropriate_place_for_inserting_a_node();
         let nodeidx = if !only_add_to_element_stack {
-            self.arena.append_child(adjusted_insertion_location, node)
+            self.arena.insert_child(adjusted_insertion_location, node)
         } else {
             self.arena.push(node)
         };
@@ -695,7 +694,7 @@ impl TreeConstructor {
             Token::Doctype { .. } => self.error(ParseError::UnexpectedDoctype),
             Token::Comment(text) => {
                 let node = DomNode::new(DomNodeType::Comment(text), Namespace::Html);
-                self.arena.append_child(self.document, node);
+                self.arena.insert_child(self.document, node);
             }
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) => {}
