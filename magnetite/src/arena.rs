@@ -32,6 +32,8 @@ impl<T> Arena<T> {
     pub fn unlink(&mut self, index: NodeId) {
         if let Some(prev) = self[index].prev {
             self[prev].next = self[index].next;
+        } else if let Some(parent) = self[index].parent {
+            self[parent].child = self[index].next;
         }
         if let Some(next) = self[index].next {
             self[next].prev = self[index].prev;
@@ -182,17 +184,17 @@ mod test {
         arena.insert_child(child2, 5);
         assert_eq!(
             &format!("{:?}", arena),
-            "Arena { arena: [ArenaNode { parent: None, child: Some(1), next: None, prev: None, value: 1 }, ArenaNode { parent: None, child: None, next: Some(2), prev: None, value: 2 }, ArenaNode { parent: None, child: Some(4), next: Some(3), prev: Some(1), value: 3 }, ArenaNode { parent: None, child: None, next: None, prev: Some(2), value: 4 }, ArenaNode { parent: None, child: None, next: None, prev: None, value: 5 }] }"
+            "Arena { arena: [ArenaNode { parent: None, child: Some(1), next: None, prev: None, value: 1 }, ArenaNode { parent: Some(0), child: None, next: Some(2), prev: None, value: 2 }, ArenaNode { parent: Some(0), child: Some(4), next: Some(3), prev: Some(1), value: 3 }, ArenaNode { parent: Some(0), child: None, next: None, prev: Some(2), value: 4 }, ArenaNode { parent: Some(2), child: None, next: None, prev: None, value: 5 }] }"
         );
         arena.unlink(child2);
         assert_eq!(
             &format!("{:?}", arena),
-            "Arena { arena: [ArenaNode { parent: None, child: Some(1), next: None, prev: None, value: 1 }, ArenaNode { parent: None, child: None, next: Some(3), prev: None, value: 2 }, ArenaNode { parent: None, child: Some(4), next: None, prev: None, value: 3 }, ArenaNode { parent: None, child: None, next: None, prev: Some(1), value: 4 }, ArenaNode { parent: None, child: None, next: None, prev: None, value: 5 }] }"
+            "Arena { arena: [ArenaNode { parent: None, child: Some(1), next: None, prev: None, value: 1 }, ArenaNode { parent: Some(0), child: None, next: Some(3), prev: None, value: 2 }, ArenaNode { parent: None, child: Some(4), next: None, prev: None, value: 3 }, ArenaNode { parent: Some(0), child: None, next: None, prev: Some(1), value: 4 }, ArenaNode { parent: Some(2), child: None, next: None, prev: None, value: 5 }] }"
         );
         arena.unlink(child1);
         assert_eq!(
             &format!("{:?}", arena),
-            "Arena { arena: [ArenaNode { parent: None, child: Some(1), next: None, prev: None, value: 1 }, ArenaNode { parent: None, child: None, next: None, prev: None, value: 2 }, ArenaNode { parent: None, child: Some(4), next: None, prev: None, value: 3 }, ArenaNode { parent: None, child: None, next: None, prev: None, value: 4 }, ArenaNode { parent: None, child: None, next: None, prev: None, value: 5 }] }"
+            "Arena { arena: [ArenaNode { parent: None, child: Some(3), next: None, prev: None, value: 1 }, ArenaNode { parent: None, child: None, next: None, prev: None, value: 2 }, ArenaNode { parent: None, child: Some(4), next: None, prev: None, value: 3 }, ArenaNode { parent: Some(0), child: None, next: None, prev: None, value: 4 }, ArenaNode { parent: Some(2), child: None, next: None, prev: None, value: 5 }] }"
         );
         println!("{:?}", arena);
     }
