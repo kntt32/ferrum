@@ -1,3 +1,5 @@
+use ferrum::demo::winit_and_softbuffer_demo;
+
 fn main() {
-    println!("Hello, world!");
+    winit_and_softbuffer_demo();
 }
