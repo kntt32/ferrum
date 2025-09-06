@@ -55,7 +55,9 @@ impl ApplicationHandler for App {
 
         let context = Context::new(window.clone()).unwrap();
         let mut surface = Surface::new(&context, window).unwrap();
-        surface.resize(NonZeroU32::new(300).unwrap(), NonZeroU32::new(400).unwrap()).unwrap();
+        surface
+            .resize(NonZeroU32::new(300).unwrap(), NonZeroU32::new(400).unwrap())
+            .unwrap();
         self.surface = Some(surface);
     }
 
