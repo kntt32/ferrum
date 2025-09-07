@@ -1,8 +1,9 @@
 # ferrum & magnetite
 
 [![License](https://img.shields.io/badge/License-MIT-blue)](https://github.com/kntt32/ferrum/blob/main/LICENSE)
-![Rust](https://img.shields.io/badge/Rust-1.89.0-orange.svg)
+![Rust](https://img.shields.io/badge/Rust-1.89.0-orange?logo=Rust)
 [![Rust](https://github.com/kntt32/ferrum/actions/workflows/rust.yml/badge.svg)](https://github.com/kntt32/ferrum/actions/workflows/rust.yml)
+![Html](https://img.shields.io/badge/HTML-living_standard-blue?logo=HTML5)
 
 a browser and a rendering engine abide by WHATWG HTML living standard written by Rust
 
