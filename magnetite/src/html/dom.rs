@@ -92,7 +92,7 @@ impl<I: SliceIndex<[ArenaNode<Node>]>> IndexMut<I> for DomArena {
         &mut self.arena[index]
     }
 }
-/*
+
 impl Deref for DomArena {
     type Target = Arena<Node>;
 
@@ -106,7 +106,7 @@ impl DerefMut for DomArena {
         &mut self.arena
     }
 }
-*/
+
 impl Default for DomArena {
     fn default() -> Self {
         Self::new()

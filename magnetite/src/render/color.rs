@@ -10,7 +10,53 @@ pub struct Color {
     pub blue: u8,
 }
 
-impl Color {}
+impl Color {
+    pub const WHITE: Self = Self {
+        red: 0xff,
+        green: 0xff,
+        blue: 0xff,
+    };
+    pub const BLACK: Self = Self {
+        red: 0x00,
+        green: 0x00,
+        blue: 0x00,
+    };
+    pub const RED: Self = Self {
+        red: 0xff,
+        green: 0x00,
+        blue: 0x00,
+    };
+    pub const GREEN: Self = Self {
+        red: 0x00,
+        green: 0xff,
+        blue: 0x00,
+    };
+    pub const BLUE: Self = Self {
+        red: 0x00,
+        green: 0x00,
+        blue: 0xff,
+    };
+
+    pub fn rotate(self) -> Self {
+        let Self {
+            red: r,
+            green: g,
+            blue: b,
+        } = self;
+        Self {
+            red: b,
+            green: r,
+            blue: g,
+        }
+    }
+
+    pub fn as_u32(self) -> u32 {
+        let red = self.red as u32;
+        let green = self.green as u32;
+        let blue = self.blue as u32;
+        (red << 16) | (green << 8) | blue
+    }
+}
 
 impl Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
