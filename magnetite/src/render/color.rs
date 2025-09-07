@@ -41,6 +41,14 @@ impl Color {
         blue: 0xff,
     };
 
+    pub fn alpha(self, a: f32, base: Self) -> Self {
+        Self {
+            red: (self.red as f32 * a + base.red as f32 * (1.0 - a)) as u8,
+            green: (self.green as f32 * a + base.green as f32 * (1.0 - a)) as u8,
+            blue: (self.blue as f32 * a + base.blue as f32 * (1.0 - a)) as u8,
+        }
+    }
+
     pub fn rotate(self) -> Self {
         let Self {
             red: r,

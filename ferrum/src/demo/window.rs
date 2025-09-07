@@ -1,7 +1,6 @@
-use ab_glyph::Font;
-use ab_glyph::FontRef;
-use ab_glyph::PxScale;
+use magnetite::render::Buff;
 use magnetite::render::Color;
+use magnetite::render::Font;
 use softbuffer::Context;
 use softbuffer::Surface;
 use std::num::NonZeroU32;
@@ -17,22 +16,34 @@ use winit::event_loop::EventLoop;
 use winit::window::Window;
 use winit::window::WindowId;
 
-static FONT: LazyLock<FontRef<'static>> = LazyLock::new(|| {
-    let font = FontRef::try_from_slice(include_bytes!(
-        "../../../assets/fonts/NotoSansJP-VariableFont_wght.ttf"
-    ))
-    .unwrap();
-    font
-});
+pub struct SBuff<'a> {
+    width: usize,
+    height: usize,
+    b: &'a mut [u32],
+}
 
-fn render_font(c: char, width: usize, height: usize, buff: &mut [u32], color: u32) {
-    let glyph = FONT.glyph_id(c).with_scale(PxScale { x: 100.0, y: 100.0 });
-    FONT.outline_glyph(glyph).unwrap().draw(|x, y, alpha| {
-        if 0.5 < alpha {
-            println!("{},{},{}", x, y, alpha);
-            buff[x as usize + y as usize * width] = color;
+impl<'a> Buff for SBuff<'a> {
+    fn width(&self) -> usize {
+        self.width
+    }
+
+    fn height(&self) -> usize {
+        self.height
+    }
+
+    fn get(&self, x: usize, y: usize) -> Option<&u32> {
+        if self.width <= x {
+            return None;
         }
-    })
+        self.b.get(x + y * self.width)
+    }
+
+    fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut u32> {
+        if self.width <= x {
+            return None;
+        }
+        self.b.get_mut(x + y * self.width)
+    }
 }
 
 pub fn winit_and_softbuffer_demo() {
@@ -59,7 +70,16 @@ impl App {
         let surface = self.surface.as_mut().unwrap();
         let mut buffer = surface.buffer_mut().unwrap();
         buffer.fill(self.color.as_u32());
-        render_font('A', 400, 300, &mut buffer, 0x00000000);
+
+        let font = Font::default();
+        let glyph = font.glyph('あ', 100.0);
+        let mut buff = SBuff {
+            b: &mut buffer,
+            width: 400,
+            height: 300,
+        };
+        font.draw(glyph, &mut buff, 100, 100, Color::WHITE);
+
         buffer.present().unwrap();
     }
 }

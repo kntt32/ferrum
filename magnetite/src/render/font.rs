@@ -1,3 +1,5 @@
+use super::color::Color;
+use super::renderer::Buff;
 use ab_glyph::Font as AbFont;
 use ab_glyph::FontRef;
 use ab_glyph::Glyph;
@@ -5,16 +7,24 @@ use ab_glyph::Rect;
 use ab_glyph::ScaleFont as AbScaleFont;
 use std::sync::LazyLock;
 
-static DEFAULT_FONT: LazyLock<FontRef<'static>> = LazyLock::new(|| {
-    FontRef::try_from_slice(include_bytes!(
-        "../../../assets/fonts/NotoSansJP-VariableFont_wght.ttf"
-    ))
-    .unwrap()
+static DEFAULT_FONT: LazyLock<Font<FontRef<'static>>> = LazyLock::new(|| {
+    Font::new(
+        FontRef::try_from_slice(include_bytes!(
+            "../../../assets/fonts/NotoSansJP-VariableFont_wght.ttf"
+        ))
+        .unwrap(),
+    )
 });
 
 #[derive(Clone, Debug)]
 pub struct Font<F: AbFont> {
     font: F,
+}
+
+impl Font<FontRef<'static>> {
+    pub fn default() -> &'static Self {
+        LazyLock::force(&DEFAULT_FONT)
+    }
 }
 
 impl<F: AbFont> Font<F> {
@@ -36,12 +46,16 @@ impl<F: AbFont> Font<F> {
         let vert = scaled_font.v_advance(glyph.id);
         Advance { horz, vert }
     }
-    /*
-    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buffer) {
+
+    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: usize, y: usize, color: Color) {
         if let Some(outline_glyph) = self.font.outline_glyph(glyph) {
-            outline_glyph.draw();
+            outline_glyph.draw(|x, y, alpha| {
+                if let Some(src) = buffer.get_mut(x as usize, y as usize) {
+                    *src = color.alpha(alpha, Color::from_u32(*src)).as_u32();
+                }
+            });
         }
-    }*/
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

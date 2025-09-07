@@ -14,6 +14,8 @@ impl Renderer {
 }
 
 pub trait Buff {
-    fn draw_dot(&mut self, x: usize, y: usize, color: Color);
-    fn draw_rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: Color);
+    fn width(&self) -> usize;
+    fn height(&self) -> usize;
+    fn get(&self, x: usize, y: usize) -> Option<&u32>;
+    fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut u32>;
 }
