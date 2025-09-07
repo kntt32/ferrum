@@ -160,6 +160,16 @@ pub struct Siblings<'a, T> {
     id: Option<NodeId>,
 }
 
+impl<'a, T> Siblings<'a, T> {
+    pub fn take(self) -> Option<NodeId> {
+        self.id
+    }
+
+    pub fn from(arena: &'a Arena<T>, id: Option<NodeId>) -> Self {
+        Self { arena, id }
+    }
+}
+
 impl<'a, T> Iterator for Siblings<'a, T> {
     type Item = NodeId;
 

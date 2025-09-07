@@ -2,6 +2,14 @@ use std::fmt::Display;
 use std::fmt::Error;
 use std::fmt::Formatter;
 use std::str::FromStr;
+use std::ops::AddAssign;
+use std::ops::Add;
+use std::ops::SubAssign;
+use std::ops::Sub;
+use std::ops::MulAssign;
+use std::ops::Mul;
+use std::ops::DivAssign;
+use std::ops::Div;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color {

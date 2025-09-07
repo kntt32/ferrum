@@ -19,7 +19,7 @@ use winit::window::WindowId;
 
 static FONT: LazyLock<FontRef<'static>> = LazyLock::new(|| {
     let font = FontRef::try_from_slice(include_bytes!(
-        "../../../fonts/NotoSansJP-VariableFont_wght.ttf"
+        "../../../assets/fonts/NotoSansJP-VariableFont_wght.ttf"
     ))
     .unwrap();
     font

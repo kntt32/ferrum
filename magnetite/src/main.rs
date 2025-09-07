@@ -7,6 +7,7 @@ use html::tree_constructor::*;
 use magnetite::arena::*;
 use magnetite::css;
 use magnetite::html;
+use magnetite::render::RenderArena;
 use std::io::Cursor;
 
 fn main() {
@@ -49,7 +50,7 @@ fn css_demo() {
 }
 
 #[allow(unused)]
-fn html_demo() {
+fn html_demo() {/*
     let stream = Cursor::new(
         r#"
 <!DOCTYPE html>
@@ -70,7 +71,19 @@ fn html_demo() {
         </p>
     </body>
 </html>"#,
-    );
+    );*/
+    let stream = Cursor::new(
+        r#"
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>
+            Hello
+        </h1>
+    </body>
+</html>
+        "#
+        );
 
     let byte_stream_decoder = ByteStreamDecoder::new(stream);
     let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
@@ -83,5 +96,9 @@ fn html_demo() {
         }
     }
 
-    println!("{:?}", tree_constructor.dom());
+    let dom = tree_constructor.take_dom();
+    println!("{:?}", dom);
+
+    let render_arena = RenderArena::new(&dom);
+    println!("{:?}", render_arena);
 }

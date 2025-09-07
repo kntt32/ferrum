@@ -54,6 +54,10 @@ impl TreeConstructor {
         &self.arena
     }
 
+    pub fn take_dom(self) -> DomArena {
+        self.arena
+    }
+
     pub fn errors(&self) -> &[ParseError] {
         &self.errors
     }
