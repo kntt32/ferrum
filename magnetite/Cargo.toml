@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 ab_glyph = "0.2.31"
+softbuffer = "=0.4.6"

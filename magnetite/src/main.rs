@@ -50,7 +50,8 @@ fn css_demo() {
 }
 
 #[allow(unused)]
-fn html_demo() {/*
+fn html_demo() {
+    /*
     let stream = Cursor::new(
         r#"
 <!DOCTYPE html>
@@ -82,8 +83,8 @@ fn html_demo() {/*
         </h1>
     </body>
 </html>
-        "#
-        );
+        "#,
+    );
 
     let byte_stream_decoder = ByteStreamDecoder::new(stream);
     let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();

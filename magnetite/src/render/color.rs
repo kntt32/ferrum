@@ -1,15 +1,11 @@
 use std::fmt::Display;
 use std::fmt::Error;
 use std::fmt::Formatter;
-use std::str::FromStr;
-use std::ops::AddAssign;
-use std::ops::Add;
-use std::ops::SubAssign;
-use std::ops::Sub;
-use std::ops::MulAssign;
-use std::ops::Mul;
-use std::ops::DivAssign;
 use std::ops::Div;
+use std::ops::DivAssign;
+use std::ops::Mul;
+use std::ops::MulAssign;
+use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color {
@@ -58,11 +54,56 @@ impl Color {
         }
     }
 
+    pub fn from_u32(u: u32) -> Self {
+        let red = u >> 16;
+        let green = u >> 8;
+        let blue = u;
+        Self {
+            red: red as u8,
+            green: green as u8,
+            blue: blue as u8,
+        }
+    }
+
     pub fn as_u32(self) -> u32 {
         let red = self.red as u32;
         let green = self.green as u32;
         let blue = self.blue as u32;
         (red << 16) | (green << 8) | blue
+    }
+}
+
+impl MulAssign<f32> for Color {
+    fn mul_assign(&mut self, rhs: f32) {
+        *self = *self * rhs
+    }
+}
+
+impl Mul<f32> for Color {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        let red = (self.red as f32 * rhs) as u8;
+        let green = (self.green as f32 * rhs) as u8;
+        let blue = (self.blue as f32 * rhs) as u8;
+        Self { red, green, blue }
+    }
+}
+
+impl DivAssign<f32> for Color {
+    fn div_assign(&mut self, rhs: f32) {
+        *self = *self / rhs
+    }
+}
+
+impl Div<f32> for Color {
+    type Output = Self;
+
+    fn div(self, rhs: f32) -> Self {
+        let red = (self.red as f32 / rhs) as u8;
+        let green = (self.green as f32 / rhs) as u8;
+        let blue = (self.blue as f32 / rhs) as u8;
+        Self { red, green, blue }
     }
 }
 
