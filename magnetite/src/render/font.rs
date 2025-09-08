@@ -84,6 +84,22 @@ impl<F: AbFont> Font<F> {
         Advance { horz, vert }
     }
 
+    pub fn draw_str(
+        &self,
+        glyphs: Vec<Glyph>,
+        buffer: &mut impl Buff,
+        mut x: isize,
+        mut y: isize,
+        color: Color,
+    ) {
+        for glyph in glyphs {
+            let Advance { horz, vert } = self.advance(&glyph);
+            self.draw(glyph, buffer, x, y, color);
+            x += horz as isize;
+            y += vert as isize;
+        }
+    }
+
     pub fn glyph(&self, c: char, size: f32) -> Glyph {
         self.font.glyph_id(c).with_scale(size)
     }
@@ -99,13 +115,11 @@ impl<F: AbFont> Font<F> {
         Advance { horz, vert }
     }
 
-    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: usize, y: usize, color: Color) {
+    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: isize, y: isize, color: Color) {
         if let Some(outline_glyph) = self.font.outline_glyph(glyph) {
             outline_glyph.draw(|draw_rel_x, draw_rel_y, alpha| {
-                if let Some(src) = buffer.get_mut(
-                    x as isize + draw_rel_x as isize,
-                    y as isize + draw_rel_y as isize,
-                ) {
+                if let Some(src) = buffer.get_mut(x + draw_rel_x as isize, y + draw_rel_y as isize)
+                {
                     *src = color.alpha(alpha, Color::from_u32(*src)).as_u32();
                 }
             });

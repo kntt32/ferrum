@@ -17,6 +17,12 @@ pub trait Buff {
             }
         }
     }
+
+    fn fill(&mut self, color: Color) {
+        let width = self.width();
+        let height = self.height();
+        self.draw_rect(0, 0, width, height, color);
+    }
 }
 
 pub struct SBuff<'a> {

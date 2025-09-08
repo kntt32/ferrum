@@ -1,3 +1,5 @@
+use super::Font;
+use super::Layout;
 use crate::arena::Arena;
 use crate::arena::NodeId;
 use crate::html::DomArena;
@@ -15,6 +17,8 @@ pub struct RenderArena {
 }
 
 impl RenderArena {
+    pub const ROOT: NodeId = 0;
+
     pub fn new(dom: &DomArena) -> Self {
         let mut this = Self {
             arena: Arena::new(),
@@ -71,7 +75,9 @@ impl RenderArena {
                     self.build_body(dom, dom_child_id, arena_child_id);
                 }
                 DomNodeType::String(ref s) => {
-                    let text = s.replace(|c: char| c.is_whitespace(), "");
+                    let text = s
+                        .replace(|c: char| c.is_whitespace(), " ")
+                        .replace("  ", " ");
                     if !text.is_empty() {
                         self.arena.insert_child(
                             arena_parent_id,
@@ -87,34 +93,37 @@ impl RenderArena {
     }
 
     fn attach_style(&mut self) {
-        self.attach_style_for(0, 0, 0, 10);
+        self.attach_style_for(0, 0, 0, 10.0);
     }
 
-    fn attach_style_for(&mut self, id: NodeId, x: usize, mut y: usize, size: usize) {
+    fn attach_style_for(&mut self, id: NodeId, x: isize, mut y: isize, size: f32) {
         let style = &mut self.arena[id].style;
         style.x = Some(x);
         style.y = Some(y);
         style.size = Some(size);
 
-        match self.arena[id].node_type {
+        match &self.arena[id].node_type {
             NodeType::Element { .. } => {
                 let mut width = 0;
 
                 for child_id in self.arena.children(id).collect::<Vec<NodeId>>() {
                     self.attach_style_for(child_id, x, y, size);
-                    y += self.arena[child_id].style.height.unwrap();
+                    y += self.arena[child_id].style.height.unwrap() as isize;
                     width = width.max(self.arena[child_id].style.width.unwrap());
                 }
 
                 let style = &mut self.arena[id].style;
                 style.width = Some(width);
-                style.height = Some(y - style.y.unwrap());
+                style.height = Some((y - style.y()) as usize);
             }
-            NodeType::Text(ref t) => {
-                let count = t.chars().count();
+            NodeType::Text(text) => {
+                let style = &self.arena[id].style;
+                let font = Font::default();
+                let glyphs = font.glyph_str(&text, style.size());
+                let Layout { width, height, .. } = font.layout_str(&glyphs);
                 let style = &mut self.arena[id].style;
-                style.width = Some(count * size / 2); // TODO
-                style.height = Some(size);
+                style.width = Some(width as usize);
+                style.height = Some(height as usize);
             }
         }
     }
@@ -136,9 +145,9 @@ impl DerefMut for RenderArena {
 
 #[derive(Clone, Copy, Debug)]
 pub struct RenderStyle {
-    size: Option<usize>,
-    x: Option<usize>,
-    y: Option<usize>,
+    size: Option<f32>,
+    x: Option<isize>,
+    y: Option<isize>,
     width: Option<usize>,
     height: Option<usize>,
 }
@@ -152,6 +161,27 @@ impl RenderStyle {
             width: None,
             height: None,
         }
+    }
+
+    pub fn size(&self) -> f32 {
+        self.size.expect("RenderStyle.size should be initialized")
+    }
+
+    pub fn x(&self) -> isize {
+        self.x.expect("RenderStyle.x should be initialized")
+    }
+
+    pub fn y(&self) -> isize {
+        self.y.expect("RenderStyle.y should be initialized")
+    }
+
+    pub fn width(&self) -> usize {
+        self.width.expect("RenderStyle.width should be initialized")
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+            .expect("RenderStyle.height should be initialized")
     }
 }
 
@@ -173,6 +203,14 @@ impl RenderNode {
             node_type,
             style: RenderStyle::new(),
         }
+    }
+
+    pub fn node_type(&self) -> &NodeType {
+        &self.node_type
+    }
+
+    pub fn style(&self) -> RenderStyle {
+        self.style
     }
 
     pub fn body() -> Self {
