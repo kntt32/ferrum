@@ -434,7 +434,7 @@ impl<'a> Tokenizer<'a> {
             '}' => self.step_rcurly(),
             c if c.is_ascii_digit() => self.step_digit(),
             c if Self::is_ident_start_code_point(c) => self.step_ident(),
-            c => self.step_anything_else(),
+            _ => self.step_anything_else(),
         };
 
         Some(token)

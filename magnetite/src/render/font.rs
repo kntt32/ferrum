@@ -1,5 +1,5 @@
+use super::buff::Buff;
 use super::color::Color;
-use super::renderer::Buff;
 use ab_glyph::Font as AbFont;
 use ab_glyph::FontRef;
 use ab_glyph::Glyph;
@@ -32,6 +32,58 @@ impl<F: AbFont> Font<F> {
         Self { font }
     }
 
+    pub fn glyph_str(&self, s: &str, size: f32) -> Vec<Glyph> {
+        let mut glyphs = Vec::new();
+        glyphs.reserve(s.chars().count());
+
+        for c in s.chars() {
+            glyphs.push(self.glyph(c, size));
+        }
+
+        glyphs
+    }
+
+    pub fn layout_str(&self, glyphs: &[Glyph]) -> Layout {
+        let mut x = 0.0f32;
+        let mut y = 0.0f32;
+        let mut width = 0.0;
+        let mut height = 0.0;
+        let mut draw_x = 0.0;
+        let mut draw_y = 0.0;
+
+        for glyph in glyphs {
+            let layout = self.layout(glyph);
+            x = x.min(layout.x + draw_x);
+            y = y.min(layout.y + draw_y);
+            width = draw_x + layout.width;
+            height = draw_y + layout.height;
+
+            let advance = self.advance(glyph);
+            draw_x += advance.horz;
+            draw_y += advance.vert;
+        }
+
+        Layout {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    pub fn advance_str(&self, glyphs: &[Glyph]) -> Advance {
+        let mut horz = 0.0;
+        let mut vert = 0.0;
+
+        for glyph in glyphs {
+            let advance = self.advance(glyph);
+            horz += advance.horz;
+            vert += advance.vert;
+        }
+
+        Advance { horz, vert }
+    }
+
     pub fn glyph(&self, c: char, size: f32) -> Glyph {
         self.font.glyph_id(c).with_scale(size)
     }
@@ -49,8 +101,11 @@ impl<F: AbFont> Font<F> {
 
     pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: usize, y: usize, color: Color) {
         if let Some(outline_glyph) = self.font.outline_glyph(glyph) {
-            outline_glyph.draw(|x, y, alpha| {
-                if let Some(src) = buffer.get_mut(x as usize, y as usize) {
+            outline_glyph.draw(|draw_rel_x, draw_rel_y, alpha| {
+                if let Some(src) = buffer.get_mut(
+                    x as isize + draw_rel_x as isize,
+                    y as isize + draw_rel_y as isize,
+                ) {
                     *src = color.alpha(alpha, Color::from_u32(*src)).as_u32();
                 }
             });

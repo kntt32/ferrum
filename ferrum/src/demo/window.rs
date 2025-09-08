@@ -1,6 +1,7 @@
 use magnetite::render::Buff;
 use magnetite::render::Color;
 use magnetite::render::Font;
+use magnetite::render::SBuff;
 use softbuffer::Context;
 use softbuffer::Surface;
 use std::num::NonZeroU32;
@@ -15,36 +16,6 @@ use winit::event_loop::ControlFlow;
 use winit::event_loop::EventLoop;
 use winit::window::Window;
 use winit::window::WindowId;
-
-pub struct SBuff<'a> {
-    width: usize,
-    height: usize,
-    b: &'a mut [u32],
-}
-
-impl<'a> Buff for SBuff<'a> {
-    fn width(&self) -> usize {
-        self.width
-    }
-
-    fn height(&self) -> usize {
-        self.height
-    }
-
-    fn get(&self, x: usize, y: usize) -> Option<&u32> {
-        if self.width <= x {
-            return None;
-        }
-        self.b.get(x + y * self.width)
-    }
-
-    fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut u32> {
-        if self.width <= x {
-            return None;
-        }
-        self.b.get_mut(x + y * self.width)
-    }
-}
 
 pub fn winit_and_softbuffer_demo() {
     let event_loop = EventLoop::new().unwrap();
@@ -73,12 +44,8 @@ impl App {
 
         let font = Font::default();
         let glyph = font.glyph('あ', 100.0);
-        let mut buff = SBuff {
-            b: &mut buffer,
-            width: 400,
-            height: 300,
-        };
-        font.draw(glyph, &mut buff, 100, 100, Color::WHITE);
+        let mut buff = SBuff::new(&mut buffer, 400, 300);
+        font.draw(glyph, &mut buff, 20, 30, Color::WHITE);
 
         buffer.present().unwrap();
     }

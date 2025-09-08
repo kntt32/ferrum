@@ -1,10 +1,6 @@
-// mod render_builder;
-
-use super::Color;
 use crate::arena::Arena;
 use crate::arena::NodeId;
 use crate::html::DomArena;
-use crate::html::DomNode;
 use crate::html::DomNodeType;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -20,8 +16,9 @@ pub struct RenderArena {
 
 impl RenderArena {
     pub fn new(dom: &DomArena) -> Self {
-        let mut arena = Arena::new();
-        let mut this = Self { arena };
+        let mut this = Self {
+            arena: Arena::new(),
+        };
         this.build_tree(dom);
         this.attach_style();
 
