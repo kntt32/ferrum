@@ -29,7 +29,7 @@ impl Renderer {
         let style = self.arena[id].style();
 
         // TODO: remove this by background color support of css
-        buff.draw_rect(
+        buff.draw_rect_border(
             style.x(),
             style.y(),
             style.width(),
@@ -46,7 +46,14 @@ impl Renderer {
             RenderNodeType::Text(text) => {
                 let font = Font::default();
                 let glyphs = font.glyph_str(&text, style.size());
-                font.draw_str(glyphs, buff, style.x(), style.y(), Color::BLACK);
+                let layout = font.layout_str(&glyphs);
+                font.draw_str(
+                    glyphs,
+                    buff,
+                    style.x() - layout.x as isize,
+                    style.y() - layout.y as isize,
+                    Color::BLACK,
+                );
             }
         }
     }

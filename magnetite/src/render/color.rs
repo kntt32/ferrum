@@ -117,7 +117,7 @@ impl Div<f32> for Color {
 
 impl Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "#{:x}{:x}{:x}", self.red, self.green, self.blue)
+        write!(f, "#{:02x}{:02x}{:02x}", self.red, self.green, self.blue)
     }
 }
 

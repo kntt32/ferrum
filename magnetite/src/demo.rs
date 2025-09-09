@@ -1,8 +1,12 @@
+use crate::html::*;
 use crate::render::Buff;
 use crate::render::Color;
 use crate::render::SBuff;
+use crate::render::*;
 use softbuffer::Context;
 use softbuffer::Surface;
+use std::io::Cursor;
+use std::io::Read;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use winit::application::ApplicationHandler;
@@ -15,8 +19,22 @@ use winit::window::Window;
 use winit::window::WindowId;
 
 pub fn render_demo() {
+    let stream = Cursor::new(
+        r#"
+<!DOCTYPE html>
+<html>
+    <body>
+        <h1>
+            Hello, World!
+        </h1>
+        <p>This is a magnetite demo</p>
+    </body>
+</html>
+        "#,
+    );
+
+    let mut app = DemoApp::new(stream);
     let mut event_loop = EventLoop::new().unwrap();
-    let mut app = DemoApp::new();
     event_loop.run_app(&mut app);
 }
 
@@ -25,15 +43,32 @@ struct DemoApp {
     height: usize,
     window: Option<Rc<Window>>,
     surface: Option<Surface<Rc<Window>, Rc<Window>>>,
+    dom: DomArena,
+    renderer: Renderer,
 }
 
 impl DemoApp {
-    pub fn new() -> Self {
+    pub fn new(stream: impl Read) -> Self {
+        let byte_stream_decoder = ByteStreamDecoder::new(stream);
+        let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
+        let mut tree_constructor = TreeConstructor::new();
+        let mut tokenizer = Tokenizer::new(input_stream_preprocessor, &mut tree_constructor);
+        loop {
+            if tokenizer.step().is_none() {
+                break;
+            }
+        }
+        let dom = tree_constructor.take_dom();
+        let render_arena = RenderArena::new(&dom);
+        let renderer = Renderer::new(render_arena);
+
         Self {
             width: 400,
             height: 300,
             window: None,
             surface: None,
+            dom,
+            renderer,
         }
     }
 }
@@ -69,19 +104,16 @@ impl ApplicationHandler for DemoApp {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                println!("LOG: exit");
                 event_loop.exit();
             }
             WindowEvent::RedrawRequested => {
                 let surface = self.surface.as_mut().unwrap();
                 let mut buff = surface.buffer_mut().unwrap();
                 let mut sbuff = SBuff::new(&mut buff, self.width, self.height);
-                sbuff.fill(Color::GREEN);
-                buff.present();
+                self.renderer.render(&mut sbuff);
+                buff.present().unwrap();
             }
-            _ => {
-                println!("LOG: {:?}", event);
-            }
+            _ => {}
         }
     }
 }

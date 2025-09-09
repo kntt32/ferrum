@@ -75,9 +75,12 @@ impl RenderArena {
                     self.build_body(dom, dom_child_id, arena_child_id);
                 }
                 DomNodeType::String(ref s) => {
-                    let text = s
-                        .replace(|c: char| c.is_whitespace(), " ")
-                        .replace("  ", " ");
+                    let mut text_chars = s.trim().chars().collect::<Vec<char>>();
+                    text_chars.dedup_by(|c1, c2| c1.is_whitespace() && c2.is_whitespace());
+                    let text = text_chars
+                        .iter()
+                        .collect::<String>()
+                        .replace(|c: char| c.is_whitespace(), " ");
                     if !text.is_empty() {
                         self.arena.insert_child(
                             arena_parent_id,
