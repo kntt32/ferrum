@@ -34,7 +34,7 @@ impl Renderer {
             style.y(),
             style.width(),
             style.height(),
-            color!("#eeeeee"),
+            color!(#eeeeee),
         );
 
         match self.arena[id].node_type() {
