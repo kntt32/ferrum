@@ -17,6 +17,35 @@ pub trait Buff {
             }
         }
     }
+
+    fn draw_rect_border(&mut self, x: isize, y: isize, width: usize, height: usize, color: Color) {
+        let code = color.as_u32();
+        let width = width as isize;
+        let height = height as isize;
+
+        for yi in y..y + height as isize {
+            if let Some(b) = self.get_mut(x, yi) {
+                *b = code;
+            }
+            if let Some(b) = self.get_mut(x + width, yi) {
+                *b = code;
+            }
+        }
+        for xi in x..x + width as isize {
+            if let Some(b) = self.get_mut(xi, y) {
+                *b = code;
+            }
+            if let Some(b) = self.get_mut(xi, y + height) {
+                *b = code;
+            }
+        }
+    }
+
+    fn fill(&mut self, color: Color) {
+        let width = self.width();
+        let height = self.height();
+        self.draw_rect(0, 0, width, height, color);
+    }
 }
 
 pub struct SBuff<'a> {

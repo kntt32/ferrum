@@ -6,12 +6,13 @@ use html::tokenizer::Tokenizer;
 use html::tree_constructor::*;
 use magnetite::arena::*;
 use magnetite::css;
+use magnetite::demo::render_demo;
 use magnetite::html;
 use magnetite::render::RenderArena;
 use std::io::Cursor;
 
 fn main() {
-    html_demo();
+    render_demo();
 }
 
 #[allow(unused)]

@@ -3,6 +3,7 @@ use super::color::Color;
 use ab_glyph::Font as AbFont;
 use ab_glyph::FontRef;
 use ab_glyph::Glyph;
+use ab_glyph::Point;
 use ab_glyph::Rect;
 use ab_glyph::ScaleFont as AbScaleFont;
 use std::sync::LazyLock;
@@ -60,7 +61,6 @@ impl<F: AbFont> Font<F> {
 
             let advance = self.advance(glyph);
             draw_x += advance.horz;
-            draw_y += advance.vert;
         }
 
         Layout {
@@ -78,14 +78,29 @@ impl<F: AbFont> Font<F> {
         for glyph in glyphs {
             let advance = self.advance(glyph);
             horz += advance.horz;
-            vert += advance.vert;
+            vert = advance.vert;
         }
 
         Advance { horz, vert }
     }
 
+    pub fn draw_str(
+        &self,
+        glyphs: Vec<Glyph>,
+        buffer: &mut impl Buff,
+        mut x: isize,
+        y: isize,
+        color: Color,
+    ) {
+        for glyph in glyphs {
+            let Advance { horz, vert } = self.advance(&glyph);
+            self.draw(glyph, buffer, x, y, color);
+            x += horz as isize;
+        }
+    }
+
     pub fn glyph(&self, c: char, size: f32) -> Glyph {
-        self.font.glyph_id(c).with_scale(size)
+        self.font.glyph_id(c).with_scale(size * 5.0)
     }
 
     pub fn layout(&self, glyph: &Glyph) -> Layout {
@@ -99,12 +114,13 @@ impl<F: AbFont> Font<F> {
         Advance { horz, vert }
     }
 
-    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: usize, y: usize, color: Color) {
+    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: isize, y: isize, color: Color) {
         if let Some(outline_glyph) = self.font.outline_glyph(glyph) {
+            let px_bounds = outline_glyph.px_bounds();
             outline_glyph.draw(|draw_rel_x, draw_rel_y, alpha| {
                 if let Some(src) = buffer.get_mut(
-                    x as isize + draw_rel_x as isize,
-                    y as isize + draw_rel_y as isize,
+                    x + draw_rel_x as isize,
+                    y + px_bounds.min.y as isize + draw_rel_y as isize,
                 ) {
                     *src = color.alpha(alpha, Color::from_u32(*src)).as_u32();
                 }

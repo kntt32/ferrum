@@ -79,6 +79,18 @@ impl Color {
         let blue = self.blue as u32;
         (red << 16) | (green << 8) | blue
     }
+
+    pub fn from_str_noprefix(s: &str) -> Result<Self, String> {
+        match u32::from_str_radix(s, 16) {
+            Ok(value) => {
+                let red = (value >> 16) as u8;
+                let green = (value >> 8) as u8;
+                let blue = value as u8;
+                Ok(Self { red, green, blue })
+            }
+            Err(e) => Err(format!("{}", e)),
+        }
+    }
 }
 
 impl MulAssign<f32> for Color {
@@ -117,7 +129,7 @@ impl Div<f32> for Color {
 
 impl Display for Color {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "#{:x}{:x}{:x}", self.red, self.green, self.blue)
+        write!(f, "#{:02x}{:02x}{:02x}", self.red, self.green, self.blue)
     }
 }
 
@@ -128,21 +140,13 @@ impl FromStr for Color {
         if !s.starts_with("#") {
             return Err("expected # character".to_string());
         }
-        match u32::from_str_radix(&s[1..], 16) {
-            Ok(value) => {
-                let red = (value >> 16) as u8;
-                let green = (value >> 8) as u8;
-                let blue = value as u8;
-                Ok(Self { red, green, blue })
-            }
-            Err(e) => Err(format!("{}", e)),
-        }
+        Self::from_str_noprefix(&s[1..])
     }
 }
 
 #[macro_export]
 macro_rules! color {
-    ($x:expr) => {
-        $x.parse::<Color>().unwrap()
+    (# $x:expr) => {
+        Color::from_str_noprefix(stringify!($x)).unwrap()
     };
 }
