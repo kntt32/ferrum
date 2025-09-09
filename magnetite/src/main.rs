@@ -1,3 +1,4 @@
+use css::parser::Parser;
 use css::tokenizer::Token as CssToken;
 use css::tokenizer::Tokenizer as CssTokenizer;
 use html::byte_stream_decoder::ByteStreamDecoder;
@@ -12,7 +13,8 @@ use magnetite::render::RenderArena;
 use std::io::Cursor;
 
 fn main() {
-    render_demo();
+    // render_demo();
+    css_demo();
 }
 
 #[allow(unused)]
@@ -33,21 +35,16 @@ fn arena_demo() {
 #[allow(unused)]
 fn css_demo() {
     let s = r#"/* コメント */
-@import url("https://example.com/style.css");
-
-:root {
-    --main-color: #ff00ff;
-    --font-size: 16px;
-    width: calc(100% - 20px);
-    height: 50vh;
+h1 {
+    color: blue;
+    font-size: medium;
 }
         "#;
 
-    let mut tokenizer = CssTokenizer::new(s);
-    while let Some(t) = tokenizer.step() {
-        println!("{:?}", t);
-    }
-    println!("{:?}", tokenizer);
+    let tokenizer = CssTokenizer::new(s);
+    let mut parser = Parser::new(tokenizer);
+    let stylesheet = parser.parse_a_style_sheet();
+    println!("{:?}", stylesheet);
 }
 
 #[allow(unused)]
