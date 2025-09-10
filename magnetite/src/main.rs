@@ -1,19 +1,17 @@
-use css::parser::Parser;
-use css::tokenizer::Token as CssToken;
-use css::tokenizer::Tokenizer as CssTokenizer;
 use html::byte_stream_decoder::ByteStreamDecoder;
 use html::input_stream_preprocessor::InputStreamPreprocessor;
 use html::tokenizer::Tokenizer;
 use html::tree_constructor::*;
 use magnetite::arena::*;
-use magnetite::css;
-use magnetite::demo::render_demo;
+use magnetite::css::CssomArena;
+use magnetite::css::Parser;
+use magnetite::css::Token as CssToken;
+use magnetite::css::Tokenizer as CssTokenizer;
 use magnetite::html;
 use magnetite::render::RenderArena;
 use std::io::Cursor;
 
 fn main() {
-    // render_demo();
     css_demo();
 }
 
@@ -35,9 +33,13 @@ fn arena_demo() {
 #[allow(unused)]
 fn css_demo() {
     let s = r#"/* コメント */
-h1 {
+.my_class {
     color: blue;
-    font-size: medium;
+    font-size: 10px;
+}
+h1.my_class {
+    color: red;
+    font-size: 20px;
 }
         "#;
 
@@ -45,6 +47,9 @@ h1 {
     let mut parser = Parser::new(tokenizer);
     let stylesheet = parser.parse_a_style_sheet();
     println!("{:?}", stylesheet);
+    let mut cssom = CssomArena::new();
+    cssom.add_stylesheet(&stylesheet);
+    println!("{:?}", cssom);
 }
 
 #[allow(unused)]

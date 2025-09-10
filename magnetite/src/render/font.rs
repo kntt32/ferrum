@@ -6,15 +6,16 @@ use ab_glyph::Glyph;
 use ab_glyph::Point;
 use ab_glyph::Rect;
 use ab_glyph::ScaleFont as AbScaleFont;
+use ab_glyph::VariableFont;
 use std::sync::LazyLock;
 
 static DEFAULT_FONT: LazyLock<Font<FontRef<'static>>> = LazyLock::new(|| {
-    Font::new(
-        FontRef::try_from_slice(include_bytes!(
-            "../../../assets/fonts/NotoSansJP-VariableFont_wght.ttf"
-        ))
-        .unwrap(),
-    )
+    let mut fontref = FontRef::try_from_slice(include_bytes!(
+        "../../../assets/fonts/NotoSansJP-VariableFont_wght.ttf"
+    ))
+    .unwrap();
+    fontref.set_variation(&[119, 103, 104, 116], 350.0);
+    Font::new(fontref)
 });
 
 #[derive(Clone, Debug)]
@@ -88,19 +89,20 @@ impl<F: AbFont> Font<F> {
         &self,
         glyphs: Vec<Glyph>,
         buffer: &mut impl Buff,
-        mut x: isize,
+        x: isize,
         y: isize,
         color: Color,
     ) {
+        let mut x = x as f32;
         for glyph in glyphs {
             let Advance { horz, vert } = self.advance(&glyph);
-            self.draw(glyph, buffer, x, y, color);
-            x += horz as isize;
+            self.draw(glyph, buffer, x as isize, y, color);
+            x += horz;
         }
     }
 
     pub fn glyph(&self, c: char, size: f32) -> Glyph {
-        self.font.glyph_id(c).with_scale(size * 5.0)
+        self.font.glyph_id(c).with_scale(size * 2.5)
     }
 
     pub fn layout(&self, glyph: &Glyph) -> Layout {

@@ -40,6 +40,11 @@ impl Color {
         green: 0x00,
         blue: 0xff,
     };
+    pub const NAMED_COLORS: &[(&str, Self)] = &[
+        ("red", Self::RED),
+        ("green", Self::GREEN),
+        ("blue", Self::BLUE),
+    ];
 
     pub fn alpha(self, a: f32, base: Self) -> Self {
         Self {
@@ -78,6 +83,17 @@ impl Color {
         let green = self.green as u32;
         let blue = self.blue as u32;
         (red << 16) | (green << 8) | blue
+    }
+
+    pub fn from_name(s: &str) -> Result<Self, String> {
+        for named_color in Self::NAMED_COLORS {
+            let (name, color) = named_color;
+            if name == &s {
+                return Ok(*color);
+            }
+        }
+
+        Err(format!("named color \"{}\" is not found", s))
     }
 
     pub fn from_str_noprefix(s: &str) -> Result<Self, String> {
