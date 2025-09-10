@@ -1,6 +1,9 @@
 use crate::arena::Arena;
 use crate::arena::ArenaNode;
 pub use crate::arena::NodeId;
+use crate::css::CssomArena;
+use crate::css::Parser as CssParser;
+use crate::css::Tokenizer as CssTokenizer;
 use std::collections::HashMap;
 use std::iter::Iterator;
 use std::ops::Deref;
@@ -27,7 +30,30 @@ impl DomArena {
         Self { arena }
     }
 
-    pub fn get_child_element(&mut self, id: NodeId, name: &str) -> Option<NodeId> {
+    pub fn cssom(&self) -> CssomArena {
+        let mut cssom = CssomArena::new();
+        if let Some(style) = self.style() {
+            let tokenizer = CssTokenizer::new(style);
+            let mut parser = CssParser::new(tokenizer);
+            cssom.add_stylesheet(&parser.parse_a_style_sheet());
+        }
+        cssom
+    }
+
+    pub fn style(&self) -> Option<&str> {
+        let html_id = self.get_child_element(Self::DOCUMENT_IDX, "html")?;
+        let head_id = self.get_child_element(html_id, "head")?;
+        let style_id = self.get_child_element(head_id, "style")?;
+        if let Some(id) = self.arena[style_id].child()
+            && let NodeType::String(ref s) = self.arena[id].node_type
+        {
+            Some(s.as_str())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_child_element(&self, id: NodeId, name: &str) -> Option<NodeId> {
         for child in self.arena.children(id) {
             if let NodeType::Element {
                 name: ref node_name,

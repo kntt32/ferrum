@@ -24,6 +24,10 @@ impl<'a> Parser<'a> {
         self.stylesheet.as_mut().unwrap()
     }
 
+    pub fn errors(&self) -> &[ParseError] {
+        &self.errors
+    }
+
     fn error(&mut self, error: ParseError) {
         self.errors.push(error);
     }
@@ -86,13 +90,14 @@ impl<'a> Parser<'a> {
         while let Some(token) = self.consume() {
             match token {
                 Token::LCurly => {
-                    style_rule.block = self.consume_a_simple_block();
+                    style_rule.block = self.consume_a_simple_block(Token::RCurly);
+                    style_rule.block.retain(|t| t != &Token::Whitespace);
                     return Some(style_rule);
                 }
                 _ => {
                     self.reconsume(token);
-                    let component = self.consume_a_component_value();
-                    style_rule.prelude.push(component);
+                    let mut component = self.consume_a_component_value();
+                    style_rule.prelude.append(&mut component);
                 }
             }
         }
@@ -101,8 +106,7 @@ impl<'a> Parser<'a> {
         None
     }
 
-    fn consume_a_simple_block(&mut self) -> Vec<Token> {
-        let ending_token = Token::RCurly;
+    fn consume_a_simple_block(&mut self, ending_token: Token) -> Vec<Token> {
         let mut simple_block = Vec::new();
 
         while let Some(token) = self.consume() {
@@ -124,7 +128,9 @@ impl<'a> Parser<'a> {
         };
 
         match token {
-            Token::LCurly | Token::LSquare | Token::LParen => self.consume_a_simple_block(),
+            Token::LCurly => self.consume_a_simple_block(Token::RCurly),
+            Token::LSquare => self.consume_a_simple_block(Token::RSquare),
+            Token::LParen => self.consume_a_simple_block(Token::RParen),
             Token::Function(..) => self.consume_a_function(),
             _ => Vec::from([token]),
         }
@@ -148,6 +154,14 @@ impl StyleSheet {
             rules: Vec::new(),
         }
     }
+
+    pub fn rules(&self) -> &[Rule] {
+        &self.rules
+    }
+
+    pub fn location(&self) -> Option<&str> {
+        self.location.as_deref()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -161,7 +175,7 @@ pub struct AtRule {}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyleRule {
-    prelude: Vec<Vec<Token>>,
+    prelude: Vec<Token>,
     block: Vec<Token>,
 }
 
@@ -172,8 +186,12 @@ impl StyleRule {
             block: Vec::new(),
         }
     }
+
+    pub fn prelude(&self) -> &[Token] {
+        &self.prelude
+    }
+
+    pub fn block(&self) -> &[Token] {
+        &self.block
+    }
 }
-
-pub struct Selector {}
-
-pub struct Declaration {}

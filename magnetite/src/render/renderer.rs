@@ -45,14 +45,14 @@ impl Renderer {
             }
             RenderNodeType::Text(text) => {
                 let font = Font::default();
-                let glyphs = font.glyph_str(&text, style.size());
+                let glyphs = font.glyph_str(&text, style.font_size());
                 let layout = font.layout_str(&glyphs);
                 font.draw_str(
                     glyphs,
                     buff,
                     style.x() - layout.x as isize,
                     style.y() - layout.y as isize,
-                    Color::BLACK,
+                    style.color(),
                 );
             }
         }

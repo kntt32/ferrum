@@ -1,5 +1,5 @@
-use ferrum::demo::winit_and_softbuffer_demo;
+use ferrum::demo::render_demo;
 
 fn main() {
-    winit_and_softbuffer_demo();
+    render_demo();
 }

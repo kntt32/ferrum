@@ -2,8 +2,11 @@ use super::Font;
 use super::Layout;
 use crate::arena::Arena;
 use crate::arena::NodeId;
+use crate::css::CssomArena;
+use crate::css::CssomStyle;
 use crate::html::DomArena;
 use crate::html::DomNodeType;
+use crate::render::Color;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -24,7 +27,8 @@ impl RenderArena {
             arena: Arena::new(),
         };
         this.build_tree(dom);
-        this.attach_style();
+        let cssom = dom.cssom();
+        this.attach_style(&cssom);
 
         this
     }
@@ -95,22 +99,31 @@ impl RenderArena {
         }
     }
 
-    fn attach_style(&mut self) {
-        self.attach_style_for(0, 0, 0, 10.0);
+    fn attach_style(&mut self, cssom: &CssomArena) {
+        self.attach_style_for(0, 0, 0, cssom);
     }
 
-    fn attach_style_for(&mut self, id: NodeId, x: isize, mut y: isize, size: f32) {
-        let style = &mut self.arena[id].style;
-        style.x = Some(x);
-        style.y = Some(y);
-        style.size = Some(size);
+    fn attach_style_for(&mut self, id: NodeId, x: isize, y: isize, cssom: &CssomArena) {
+        self.arena[id].style = if let Some(parent_id) = self.arena[id].parent() {
+            self.arena[parent_id].style
+        } else {
+            RenderStyle::body()
+        };
+        self.arena[id].style.x = Some(x);
+        self.arena[id].style.y = Some(y);
+        if let Some(cssom_style) = cssom.search_style_rule(self, id) {
+            let style = &mut self.arena[id].style;
+            style.attach_cssom_style(&cssom_style);
+        }
 
+        let x = self.arena[id].style.x.unwrap();
+        let mut y = self.arena[id].style.y.unwrap();
         match &self.arena[id].node_type {
             NodeType::Element { .. } => {
                 let mut width = 0;
 
                 for child_id in self.arena.children(id).collect::<Vec<NodeId>>() {
-                    self.attach_style_for(child_id, x, y, size);
+                    self.attach_style_for(child_id, x, y, cssom);
                     y += self.arena[child_id].style.height.unwrap() as isize;
                     width = width.max(self.arena[child_id].style.width.unwrap());
                 }
@@ -122,7 +135,7 @@ impl RenderArena {
             NodeType::Text(text) => {
                 let style = &self.arena[id].style;
                 let font = Font::default();
-                let glyphs = font.glyph_str(&text, style.size());
+                let glyphs = font.glyph_str(&text, style.font_size());
                 let Layout { width, height, .. } = font.layout_str(&glyphs);
                 let style = &mut self.arena[id].style;
                 style.width = Some(width as usize);
@@ -148,7 +161,8 @@ impl DerefMut for RenderArena {
 
 #[derive(Clone, Copy, Debug)]
 pub struct RenderStyle {
-    size: Option<f32>,
+    font_size: Option<f32>,
+    color: Option<Color>,
     x: Option<isize>,
     y: Option<isize>,
     width: Option<usize>,
@@ -158,7 +172,8 @@ pub struct RenderStyle {
 impl RenderStyle {
     pub fn new() -> Self {
         Self {
-            size: None,
+            font_size: None,
+            color: None,
             x: None,
             y: None,
             width: None,
@@ -166,25 +181,49 @@ impl RenderStyle {
         }
     }
 
-    pub fn size(&self) -> f32 {
-        self.size.expect("RenderStyle.size should be initialized")
+    pub fn body() -> Self {
+        Self {
+            font_size: Some(10.0),
+            color: Some(Color::BLACK),
+            x: Some(0),
+            y: Some(0),
+            width: None,
+            height: None,
+        }
+    }
+
+    pub fn attach_cssom_style(&mut self, cssom_style: &CssomStyle) {
+        self.font_size = cssom_style
+            .font_size
+            .as_ref()
+            .map(|v| v.as_pixel())
+            .or(self.font_size);
+        self.color = cssom_style.color.or(self.color);
+    }
+
+    pub fn font_size(&self) -> f32 {
+        self.font_size
+            .expect("RenderStyle.font_size must be initialized")
+    }
+
+    pub fn color(&self) -> Color {
+        self.color.expect("RenderStyle.color must be initialized")
     }
 
     pub fn x(&self) -> isize {
-        self.x.expect("RenderStyle.x should be initialized")
+        self.x.expect("RenderStyle.x must be initialized")
     }
 
     pub fn y(&self) -> isize {
-        self.y.expect("RenderStyle.y should be initialized")
+        self.y.expect("RenderStyle.y must be initialized")
     }
 
     pub fn width(&self) -> usize {
-        self.width.expect("RenderStyle.width should be initialized")
+        self.width.expect("RenderStyle.width must be initialized")
     }
 
     pub fn height(&self) -> usize {
-        self.height
-            .expect("RenderStyle.height should be initialized")
+        self.height.expect("RenderStyle.height must be initialized")
     }
 }
 
