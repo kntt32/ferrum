@@ -20,6 +20,14 @@ pub fn render_demo() {
         r#"
 <!DOCTYPE html>
 <html>
+    <head>
+        <style>
+            h1 {
+                color: blue;
+                font-size: 20px;
+            }
+        </style>
+    </head>
     <body>
         <h1>
             Hello, World!

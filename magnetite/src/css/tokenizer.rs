@@ -657,6 +657,15 @@ pub enum Num {
     Floating(f64),
 }
 
+impl Num {
+    pub fn as_floating(self) -> f64 {
+        match self {
+            Self::Integer(i) => i as f64,
+            Self::Floating(f) => f,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

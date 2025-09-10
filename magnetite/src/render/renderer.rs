@@ -52,7 +52,7 @@ impl Renderer {
                     buff,
                     style.x() - layout.x as isize,
                     style.y() - layout.y as isize,
-                    Color::BLACK,
+                    style.color(),
                 );
             }
         }

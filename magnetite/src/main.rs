@@ -70,9 +70,7 @@ fn html_demo() {
         <h1>
             Hello
         </h1>
-        <p>
-            Hello, Magnetite!
-        </p>
+        <p>World!</p>
     </body>
 </html>"#,
     );

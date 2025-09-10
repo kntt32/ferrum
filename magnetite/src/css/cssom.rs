@@ -6,6 +6,8 @@ use super::Token;
 use crate::arena::Arena;
 use crate::arena::NodeId;
 use crate::render::Color;
+use crate::render::RenderArena;
+use crate::render::RenderNodeType;
 use std::slice::Iter;
 
 #[derive(Clone, Debug)]
@@ -42,6 +44,24 @@ impl CssomArena {
         let id = self.arena.push(CssomRule::StyleRule(cssom_stylerule));
         Some(id)
     }
+
+    pub fn search_style_rule<'a>(
+        &'a self,
+        render_arena: &RenderArena,
+        id: NodeId,
+    ) -> Option<CssomStyle> {
+        for i in &self.roots {
+            if let CssomRule::StyleRule(ref rule) = *self.arena[*i] {
+                let selectors = &rule.selectors;
+                for s in selectors {
+                    if Selector::match_selectors_with(s, render_arena, id) {
+                        return Some(rule.style.clone());
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -73,6 +93,43 @@ pub enum Selector {
 }
 
 impl Selector {
+    pub fn match_with(&self, nodetype: &RenderNodeType) -> bool {
+        match self {
+            Self::Type(t) => {
+                matches!(nodetype, RenderNodeType::Element{name, ..} if name == t)
+            }
+            Self::Universal => true,
+            _ => panic!(),
+        }
+    }
+
+    pub fn match_selectors_with(
+        selectors: &[Self],
+        render_arena: &RenderArena,
+        mut id: NodeId,
+    ) -> bool {
+        let mut iter = selectors.iter().rev();
+        if let Some(selector) = iter.next()
+            && selector.match_with(render_arena[id].node_type())
+        {
+            let Some(i) = render_arena[id].parent() else {
+                return false;
+            };
+            id = i;
+            while let Some(selector) = iter.next() {
+                if selector.match_with(render_arena[id].node_type()) {
+                    let Some(i) = render_arena[id].parent() else {
+                        return false;
+                    };
+                    id = i;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn from_tokens(tokens: &[Token]) -> Option<Vec<Vec<Selector>>> {
         let mut selectors_list = Vec::new();
         let mut selectors = Vec::new();
@@ -107,8 +164,8 @@ impl Selector {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CssomStyle {
-    color: Option<Color>,
-    font_size: Option<Value>,
+    pub color: Option<Color>,
+    pub font_size: Option<Value>,
 }
 
 impl CssomStyle {
@@ -188,6 +245,12 @@ impl Value {
         match unit {
             "px" => Some(Self::Pixel(num)),
             _ => None,
+        }
+    }
+
+    pub fn as_pixel(&self) -> f32 {
+        match self {
+            Self::Pixel(num) => num.as_floating() as f32,
         }
     }
 }
