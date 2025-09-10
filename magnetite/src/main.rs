@@ -12,7 +12,7 @@ use magnetite::render::RenderArena;
 use std::io::Cursor;
 
 fn main() {
-    css_demo();
+    html_demo();
 }
 
 #[allow(unused)]
@@ -54,7 +54,6 @@ h1.my_class {
 
 #[allow(unused)]
 fn html_demo() {
-    /*
     let stream = Cursor::new(
         r#"
 <!DOCTYPE html>
@@ -63,6 +62,7 @@ fn html_demo() {
         <style>
             h1 {
                 color: blue;
+                font-size: 20px;
             }
         </style>
     </head>
@@ -75,18 +75,6 @@ fn html_demo() {
         </p>
     </body>
 </html>"#,
-    );*/
-    let stream = Cursor::new(
-        r#"
-<!DOCTYPE html>
-<html>
-    <body>
-        <h1>
-            Hello
-        </h1>
-    </body>
-</html>
-        "#,
     );
 
     let byte_stream_decoder = ByteStreamDecoder::new(stream);
@@ -102,7 +90,13 @@ fn html_demo() {
 
     let dom = tree_constructor.take_dom();
     println!("{:?}", dom);
+    println!("{:?}", dom.style());
 
     let render_arena = RenderArena::new(&dom);
     println!("{:?}", render_arena);
+
+    let mut cssparser = Parser::new(CssTokenizer::new(dom.style().unwrap()));
+    let mut cssom = CssomArena::new();
+    cssom.add_stylesheet(&cssparser.parse_a_style_sheet());
+    println!("{:?}", cssom);
 }

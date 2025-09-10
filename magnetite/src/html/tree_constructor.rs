@@ -1,5 +1,6 @@
 use super::dom::*;
 use super::tokenizer::*;
+use crate::css::CssomArena;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -124,7 +125,7 @@ impl TreeConstructor {
             Token::EndTag { name, .. } if &name == "script" => {
                 unimplemented!();
             }
-            Token::EndTag { .. } => {
+            Token::EndTag { name, .. } => {
                 self.open_elements.pop();
                 self.switch_to_original_insertion_mode();
             }
