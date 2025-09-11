@@ -1,123 +1,160 @@
+use super::CascadeOrd;
 use super::Num;
+use super::Origin;
+use super::Parser;
 use super::Rule;
 use super::StyleRule;
 use super::StyleSheet;
 use super::Token;
+use super::Tokenizer;
 use crate::arena::Arena;
 use crate::arena::NodeId;
 use crate::render::Color;
 use crate::render::RenderArena;
 use crate::render::RenderNodeType;
 use std::slice::Iter;
+use std::sync::LazyLock;
 
 #[derive(Clone, Debug)]
 pub struct CssomArena {
     roots: Vec<NodeId>,
-    arena: Arena<CssomRule>,
+    arena: Arena<CssomStyleRule>,
 }
 
 impl CssomArena {
     pub fn new() -> Self {
-        Self {
+        let mut this = Self {
             roots: Vec::new(),
             arena: Arena::new(),
-        }
+        };
+
+        static USERAGENT_STYLESHEET: LazyLock<StyleSheet> = LazyLock::new(|| {
+            let tokenizer = Tokenizer::new(include_str!("../../../html.css"));
+            let mut parser = Parser::new(tokenizer);
+            parser.parse_a_style_sheet()
+        });
+
+        this.add_stylesheet(&USERAGENT_STYLESHEET, Origin::UserAgent);
+        this
     }
 
-    pub fn add_stylesheet(&mut self, stylesheet: &StyleSheet) {
+    pub fn add_stylesheet(&mut self, stylesheet: &StyleSheet, origin: Origin) {
         let rules: &[Rule] = stylesheet.rules();
 
         for rule in rules {
             match rule {
                 Rule::AtRule(..) => unimplemented!(),
                 Rule::StyleRule(stylerule) => {
-                    if let Some(id) = self.push_stylerule(stylerule) {
+                    for s in CssomStyleRule::from_stylerule(stylerule, origin, false) {
+                        let id = self.arena.push(s);
                         self.roots.push(id);
                     }
                 }
             }
         }
+
+        self.roots.sort_by(|lhs, rhs| {
+            self.arena[*lhs]
+                .selector
+                .ord
+                .cmp(&self.arena[*rhs].selector.ord)
+        });
+        println!("{:?}", self);
     }
 
-    fn push_stylerule(&mut self, stylerule: &StyleRule) -> Option<NodeId> {
-        let cssom_stylerule = CssomStyleRule::from_stylerule(stylerule)?;
-        let id = self.arena.push(CssomRule::StyleRule(cssom_stylerule));
-        Some(id)
-    }
-
-    pub fn search_style_rule<'a>(
-        &'a self,
-        render_arena: &RenderArena,
-        id: NodeId,
-    ) -> Option<CssomStyle> {
+    pub fn attach_style_for(&self, render_arena: &mut RenderArena, id: NodeId) {
         for i in &self.roots {
-            if let CssomRule::StyleRule(ref rule) = *self.arena[*i] {
-                let selectors = &rule.selectors;
-                for s in selectors {
-                    if Selector::match_selectors_with(s, render_arena, id) {
-                        return Some(rule.style.clone());
-                    }
-                }
+            let style = &self.arena[*i].style;
+            let selector = &self.arena[*i].selector;
+            if selector.match_with(render_arena, id) {
+                render_arena[id].style.attach_cssom_style(style);
             }
         }
-        None
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum CssomRule {
-    StyleRule(CssomStyleRule),
-    AtRule(CssomAtRule),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CssomStyleRule {
-    selectors: Vec<Vec<Selector>>,
+    selector: Selector,
     style: CssomStyle,
 }
 
 impl CssomStyleRule {
-    pub fn from_stylerule(stylerule: &StyleRule) -> Option<Self> {
-        let selectors = Selector::from_tokens(stylerule.prelude())?;
-        let style = CssomStyle::from_tokens(stylerule.block())?;
-        Some(Self { selectors, style })
+    pub fn from_stylerule(stylerule: &StyleRule, origin: Origin, important: bool) -> Vec<Self> {
+        if let Some(selectors) = Selector::from_tokens(stylerule.prelude(), origin, important)
+            && let Some(style) = CssomStyle::from_tokens(stylerule.block())
+        {
+            let mut vec = Vec::new();
+            for selector in selectors {
+                vec.push(Self {
+                    selector,
+                    style: style.clone(),
+                });
+            }
+            vec
+        } else {
+            Vec::new()
+        }
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Selector {
-    Type(String),
-    Id(String),
-    Class(String),
-    Universal,
+pub struct Selector {
+    units: Vec<SelectorUnit>,
+    ord: CascadeOrd,
 }
 
 impl Selector {
-    pub fn match_with(&self, nodetype: &RenderNodeType) -> bool {
-        match self {
-            Self::Type(t) => {
-                matches!(nodetype, RenderNodeType::Element{name, ..} if name == t)
-            }
-            Self::Universal => true,
-            _ => panic!(),
+    pub fn new(origin: Origin, important: bool) -> Self {
+        Self {
+            units: Vec::new(),
+            ord: CascadeOrd::new(origin, important),
         }
     }
 
-    pub fn match_selectors_with(
-        selectors: &[Self],
-        render_arena: &RenderArena,
-        mut id: NodeId,
-    ) -> bool {
-        let mut iter = selectors.iter().rev();
-        if let Some(selector) = iter.next()
-            && selector.match_with(render_arena[id].node_type())
+    pub fn from_tokens(tokens: &[Token], origin: Origin, important: bool) -> Option<Vec<Self>> {
+        let mut selectors = Vec::new();
+        let mut this = Self::new(origin, important);
+        let mut prelude = tokens.iter();
+
+        while let Some(token) = prelude.next() {
+            match token {
+                Token::Whitespace => {}
+                Token::Ident(name) => {
+                    this.units.push(SelectorUnit::Type(name.clone()));
+                }
+                Token::Hash { value, .. } => {
+                    this.units.push(SelectorUnit::Id(value.clone()));
+                }
+                Token::Delim(c) if *c == '.' => {
+                    let Some(Token::Ident(name)) = prelude.next() else {
+                        return None;
+                    };
+                    this.units.push(SelectorUnit::Class(name.clone()));
+                }
+                Token::Delim(c) if *c == ',' => {
+                    selectors.push(this);
+                    this = Self::new(origin, important);
+                }
+                _ => todo!(),
+            }
+        }
+
+        selectors.push(this);
+        Some(selectors)
+    }
+
+    pub fn match_with(&self, render_arena: &RenderArena, mut id: NodeId) -> bool {
+        let mut iter = self.units.iter().rev();
+        if let Some(unit) = iter.next()
+            && unit.match_with(render_arena[id].node_type())
         {
             let Some(i) = render_arena[id].parent() else {
                 return false;
             };
             id = i;
-            while let Some(selector) = iter.next() {
-                if selector.match_with(render_arena[id].node_type()) {
+            while let Some(unit) = iter.next() {
+                if unit.match_with(render_arena[id].node_type()) {
                     let Some(i) = render_arena[id].parent() else {
                         return false;
                     };
@@ -129,36 +166,25 @@ impl Selector {
             false
         }
     }
+}
 
-    pub fn from_tokens(tokens: &[Token]) -> Option<Vec<Vec<Selector>>> {
-        let mut selectors_list = Vec::new();
-        let mut selectors = Vec::new();
-        let mut prelude = tokens.iter();
+#[derive(Clone, Debug, PartialEq)]
+pub enum SelectorUnit {
+    Type(String),
+    Id(String),
+    Class(String),
+    Universal,
+}
 
-        while let Some(token) = prelude.next() {
-            match token {
-                Token::Whitespace => {}
-                Token::Ident(name) => {
-                    selectors.push(Selector::Type(name.clone()));
-                }
-                Token::Hash { value, .. } => {
-                    selectors.push(Selector::Id(value.clone()));
-                }
-                Token::Delim(c) if *c == '.' => {
-                    let Some(Token::Ident(name)) = prelude.next() else {
-                        return None;
-                    };
-                    selectors.push(Selector::Class(name.clone()));
-                }
-                Token::Delim(c) if *c == ',' => {
-                    selectors_list.push(selectors);
-                    selectors = Vec::new();
-                }
-                _ => todo!(),
+impl SelectorUnit {
+    pub fn match_with(&self, nodetype: &RenderNodeType) -> bool {
+        match self {
+            Self::Type(t) => {
+                matches!(nodetype, RenderNodeType::Element{name, ..} if name == t)
             }
+            Self::Universal => true,
+            _ => panic!(),
         }
-        selectors_list.push(selectors);
-        Some(selectors_list)
     }
 }
 

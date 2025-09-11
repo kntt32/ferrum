@@ -45,7 +45,7 @@ impl<'a> Parser<'a> {
         self.remaining_token = Some(token);
     }
 
-    pub fn parse_a_style_sheet(&mut self) -> StyleSheet {
+    pub fn parse_a_style_sheet(mut self) -> StyleSheet {
         self.stylesheet = Some(StyleSheet::new());
         self.top_level_flag = true;
         self.consume_a_list_of_rules();

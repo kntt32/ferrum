@@ -2,6 +2,7 @@ use crate::arena::Arena;
 use crate::arena::ArenaNode;
 pub use crate::arena::NodeId;
 use crate::css::CssomArena;
+use crate::css::Origin;
 use crate::css::Parser as CssParser;
 use crate::css::Tokenizer as CssTokenizer;
 use std::collections::HashMap;
@@ -35,7 +36,7 @@ impl DomArena {
         if let Some(style) = self.style() {
             let tokenizer = CssTokenizer::new(style);
             let mut parser = CssParser::new(tokenizer);
-            cssom.add_stylesheet(&parser.parse_a_style_sheet());
+            cssom.add_stylesheet(&parser.parse_a_style_sheet(), Origin::Developer);
         }
         cssom
     }

@@ -24,7 +24,6 @@ pub fn view() {
         <style>
             h1 {
                 color: blue;
-                font-size: 20px;
             }
             p {
                 background: #00dd00;

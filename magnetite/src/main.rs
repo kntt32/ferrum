@@ -4,6 +4,7 @@ use html::tokenizer::Tokenizer;
 use html::tree_constructor::*;
 use magnetite::arena::*;
 use magnetite::css::CssomArena;
+use magnetite::css::Origin;
 use magnetite::css::Parser;
 use magnetite::css::Token as CssToken;
 use magnetite::css::Tokenizer as CssTokenizer;
@@ -48,7 +49,7 @@ h1.my_class {
     let stylesheet = parser.parse_a_style_sheet();
     println!("{:?}", stylesheet);
     let mut cssom = CssomArena::new();
-    cssom.add_stylesheet(&stylesheet);
+    cssom.add_stylesheet(&stylesheet, Origin::UserAgent);
     println!("{:?}", cssom);
 }
 
@@ -93,8 +94,6 @@ fn html_demo() {
     let render_arena = RenderArena::new(&dom);
     println!("{:?}", render_arena);
 
-    let mut cssparser = Parser::new(CssTokenizer::new(dom.style().unwrap()));
-    let mut cssom = CssomArena::new();
-    cssom.add_stylesheet(&cssparser.parse_a_style_sheet());
+    let cssom = dom.cssom();
     println!("{:?}", cssom);
 }

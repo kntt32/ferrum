@@ -111,10 +111,7 @@ impl RenderArena {
         };
         self.arena[id].style.x = Some(x);
         self.arena[id].style.y = Some(y);
-        if let Some(cssom_style) = cssom.search_style_rule(self, id) {
-            let style = &mut self.arena[id].style;
-            style.attach_cssom_style(&cssom_style);
-        }
+        cssom.attach_style_for(self, id);
 
         let x = self.arena[id].style.x.unwrap();
         let mut y = self.arena[id].style.y.unwrap();
@@ -164,10 +161,10 @@ pub struct RenderStyle {
     pub font_size: Option<f32>,
     pub color: Option<Color>,
     pub background_color: Option<Color>,
-    x: Option<isize>,
-    y: Option<isize>,
-    width: Option<usize>,
-    height: Option<usize>,
+    pub x: Option<isize>,
+    pub y: Option<isize>,
+    pub width: Option<usize>,
+    pub height: Option<usize>,
 }
 
 impl RenderStyle {
@@ -252,7 +249,7 @@ impl Default for RenderStyle {
 #[derive(Clone, Debug)]
 pub struct RenderNode {
     node_type: NodeType,
-    style: RenderStyle,
+    pub style: RenderStyle,
 }
 
 impl RenderNode {
