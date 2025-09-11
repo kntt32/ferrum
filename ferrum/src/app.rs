@@ -15,7 +15,7 @@ use winit::event_loop::EventLoop;
 use winit::window::Window;
 use winit::window::WindowId;
 
-pub fn render_demo() {
+pub fn view() {
     let stream = Cursor::new(
         r#"
 <!DOCTYPE html>
@@ -25,6 +25,9 @@ pub fn render_demo() {
             h1 {
                 color: blue;
                 font-size: 20px;
+            }
+            p {
+                background: #00dd00;
             }
         </style>
     </head>
@@ -38,12 +41,12 @@ pub fn render_demo() {
         "#,
     );
 
-    let mut app = DemoApp::new(stream);
+    let mut app = Ferrum::new(stream);
     let mut event_loop = EventLoop::new().unwrap();
     event_loop.run_app(&mut app);
 }
 
-struct DemoApp {
+pub struct Ferrum {
     width: usize,
     height: usize,
     window: Option<Rc<Window>>,
@@ -52,7 +55,7 @@ struct DemoApp {
     renderer: Renderer,
 }
 
-impl DemoApp {
+impl Ferrum {
     pub fn new(stream: impl Read) -> Self {
         let byte_stream_decoder = ByteStreamDecoder::new(stream);
         let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
@@ -78,7 +81,7 @@ impl DemoApp {
     }
 }
 
-impl ApplicationHandler for DemoApp {
+impl ApplicationHandler for Ferrum {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let mut attributes = Window::default_attributes();
         attributes.inner_size = Some(Size::Physical(PhysicalSize {
@@ -86,7 +89,7 @@ impl ApplicationHandler for DemoApp {
             height: self.height as u32,
         }));
         let mut window = event_loop.create_window(attributes).unwrap();
-        window.set_title("magnetite demo");
+        window.set_title("ferrum");
         let window = Rc::new(window);
         self.window = Some(window.clone());
 

@@ -1,5 +1,5 @@
-use ferrum::demo::render_demo;
+use ferrum::view;
 
 fn main() {
-    render_demo();
+    view()
 }

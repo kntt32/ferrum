@@ -1,1 +1,3 @@
-pub mod demo;
+mod app;
+pub use app::Ferrum;
+pub use app::view;

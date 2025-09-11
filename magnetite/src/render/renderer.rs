@@ -28,14 +28,15 @@ impl Renderer {
     fn render_node(&self, buff: &mut impl Buff, id: NodeId) {
         let style = self.arena[id].style();
 
-        // TODO: remove this by background color support of css
-        buff.draw_rect_border(
-            style.x(),
-            style.y(),
-            style.width(),
-            style.height(),
-            color!(#eeeeee),
-        );
+        if let Some(background_color) = style.background_color {
+            buff.draw_rect(
+                style.x(),
+                style.y(),
+                style.width(),
+                style.height(),
+                background_color,
+            );
+        }
 
         match self.arena[id].node_type() {
             RenderNodeType::Element { .. } => {

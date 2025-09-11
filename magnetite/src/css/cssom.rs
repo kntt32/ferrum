@@ -164,6 +164,7 @@ impl Selector {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CssomStyle {
+    pub background_color: Option<Color>,
     pub color: Option<Color>,
     pub font_size: Option<Value>,
 }
@@ -171,6 +172,7 @@ pub struct CssomStyle {
 impl CssomStyle {
     pub fn new() -> Self {
         Self {
+            background_color: None,
             color: None,
             font_size: None,
         }
@@ -194,6 +196,12 @@ impl CssomStyle {
             {}
 
             match name.as_str() {
+                "background-color" => {
+                    this.parse_background_color(iter);
+                }
+                "background" => {
+                    this.parse_background(iter);
+                }
                 "color" => {
                     this.parse_color(iter);
                 }
@@ -207,6 +215,14 @@ impl CssomStyle {
         Some(this)
     }
 
+    fn parse_background_color<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
+        self.background_color = self.parse_part_color(&mut iter).or(self.background_color);
+    }
+
+    fn parse_background<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
+        self.background_color = self.parse_part_color(&mut iter).or(self.background_color);
+    }
+
     fn parse_font_size<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
         match iter.next() {
             Some(Token::Dimension { value, unit }) => {
@@ -218,20 +234,19 @@ impl CssomStyle {
         }
     }
 
-    fn parse_color<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
+    fn parse_part_color<'a>(
+        &mut self,
+        iter: &mut impl Iterator<Item = &'a Token>,
+    ) -> Option<Color> {
         match iter.next() {
-            Some(Token::Ident(name)) => {
-                if let Ok(color) = Color::from_name(name) {
-                    self.color = Some(color);
-                }
-            }
-            Some(Token::Hash { value, .. }) => {
-                if let Ok(color) = Color::from_str_noprefix(value) {
-                    self.color = Some(color);
-                }
-            }
-            _ => {}
+            Some(Token::Ident(name)) => Color::from_name(name).ok(),
+            Some(Token::Hash { value, .. }) => Color::from_str_noprefix(value).ok(),
+            _ => None,
         }
+    }
+
+    fn parse_color<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
+        self.color = self.parse_part_color(&mut iter).or(self.color);
     }
 }
 

@@ -105,7 +105,7 @@ impl RenderArena {
 
     fn attach_style_for(&mut self, id: NodeId, x: isize, y: isize, cssom: &CssomArena) {
         self.arena[id].style = if let Some(parent_id) = self.arena[id].parent() {
-            self.arena[parent_id].style
+            self.arena[parent_id].style.inherit()
         } else {
             RenderStyle::body()
         };
@@ -161,8 +161,9 @@ impl DerefMut for RenderArena {
 
 #[derive(Clone, Copy, Debug)]
 pub struct RenderStyle {
-    font_size: Option<f32>,
-    color: Option<Color>,
+    pub font_size: Option<f32>,
+    pub color: Option<Color>,
+    pub background_color: Option<Color>,
     x: Option<isize>,
     y: Option<isize>,
     width: Option<usize>,
@@ -174,6 +175,7 @@ impl RenderStyle {
         Self {
             font_size: None,
             color: None,
+            background_color: None,
             x: None,
             y: None,
             width: None,
@@ -185,8 +187,21 @@ impl RenderStyle {
         Self {
             font_size: Some(10.0),
             color: Some(Color::BLACK),
+            background_color: None,
             x: Some(0),
             y: Some(0),
+            width: None,
+            height: None,
+        }
+    }
+
+    pub fn inherit(&self) -> Self {
+        Self {
+            font_size: self.font_size,
+            color: self.color,
+            background_color: None,
+            x: None,
+            y: None,
             width: None,
             height: None,
         }
@@ -199,6 +214,7 @@ impl RenderStyle {
             .map(|v| v.as_pixel())
             .or(self.font_size);
         self.color = cssom_style.color.or(self.color);
+        self.background_color = cssom_style.background_color.or(self.background_color);
     }
 
     pub fn font_size(&self) -> f32 {
