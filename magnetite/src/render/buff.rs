@@ -74,7 +74,7 @@ impl<'a> Buff for SBuff<'a> {
     }
 
     fn get(&self, x: isize, y: isize) -> Option<&u32> {
-        if 0 <= x && 0 <= y {
+        if 0 <= x && 0 <= y && x < self.width as isize && y < self.height as isize {
             self.buff.get(x as usize + y as usize * self.width)
         } else {
             None
@@ -82,7 +82,7 @@ impl<'a> Buff for SBuff<'a> {
     }
 
     fn get_mut(&mut self, x: isize, y: isize) -> Option<&mut u32> {
-        if 0 <= x && 0 <= y {
+        if 0 <= x && 0 <= y && x < self.width as isize && y < self.height as isize {
             self.buff.get_mut(x as usize + y as usize * self.width)
         } else {
             None

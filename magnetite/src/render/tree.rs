@@ -29,6 +29,7 @@ impl RenderArena {
         this.build_tree(dom);
         let cssom = dom.cssom();
         this.attach_style(&cssom);
+        println!("THIS: {:?} at tree.rs", this);
 
         this
     }

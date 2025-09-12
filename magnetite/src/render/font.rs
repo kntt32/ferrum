@@ -3,18 +3,16 @@ use super::color::Color;
 use ab_glyph::Font as AbFont;
 use ab_glyph::FontRef;
 use ab_glyph::Glyph;
-use ab_glyph::Point;
 use ab_glyph::Rect;
 use ab_glyph::ScaleFont as AbScaleFont;
 use ab_glyph::VariableFont;
 use std::sync::LazyLock;
 
 static DEFAULT_FONT: LazyLock<Font<FontRef<'static>>> = LazyLock::new(|| {
-    let mut fontref = FontRef::try_from_slice(include_bytes!(
-        "../../../assets/fonts/NotoSansJP-VariableFont_wght.ttf"
+    let fontref = FontRef::try_from_slice(include_bytes!(
+        "../../../assets/fonts/NotoSerifJP/NotoSerifJP-Regular.ttf"
     ))
     .unwrap();
-    fontref.set_variation(&[119, 103, 104, 116], 350.0);
     Font::new(fontref)
 });
 
@@ -51,7 +49,7 @@ impl<F: AbFont> Font<F> {
         let mut width = 0.0;
         let mut height = 0.0;
         let mut draw_x = 0.0;
-        let mut draw_y = 0.0;
+        let draw_y = 0.0;
 
         for glyph in glyphs {
             let layout = self.layout(glyph);
@@ -95,7 +93,7 @@ impl<F: AbFont> Font<F> {
     ) {
         let mut x = x as f32;
         for glyph in glyphs {
-            let Advance { horz, vert } = self.advance(&glyph);
+            let Advance { horz, .. } = self.advance(&glyph);
             self.draw(glyph, buffer, x as isize, y, color);
             x += horz;
         }

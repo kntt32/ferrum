@@ -1,6 +1,5 @@
 use super::dom::*;
 use super::tokenizer::*;
-use crate::css::CssomArena;
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -125,7 +124,7 @@ impl TreeConstructor {
             Token::EndTag { name, .. } if &name == "script" => {
                 unimplemented!();
             }
-            Token::EndTag { name, .. } => {
+            Token::EndTag { .. } => {
                 self.open_elements.pop();
                 self.switch_to_original_insertion_mode();
             }
@@ -531,6 +530,18 @@ impl TreeConstructor {
         Some(TokenizerState::RawText)
     }
 
+    fn parse_generic_rcdata_element(
+        &mut self,
+        name: String,
+        attributes: HashMap<String, String>,
+    ) -> Option<TokenizerState> {
+        self.insert_element(name, attributes);
+        self.set_original_insertion_mode();
+        self.switch_to(InsertionMode::Text);
+
+        Some(TokenizerState::RcData)
+    }
+
     fn handle_token_in_head(&mut self, token: Token) -> Option<TokenizerState> {
         match token {
             Token::Character(c)
@@ -563,11 +574,19 @@ impl TreeConstructor {
                 self.insert_element(name, attributes);
                 None
             }
+            Token::StartTag {
+                name, attributes, ..
+            } if name == "meta" => {
+                self.insert_element(name, attributes);
+                self.open_elements.pop();
+                // TODO
+                None
+            }
+            Token::StartTag {
+                name, attributes, ..
+            } if name == "title" => self.parse_generic_rcdata_element(name, attributes),
             Token::StartTag { name, .. }
-                if [
-                    "meta", "title", "noscript", "noframes", "style", "script", "head", "template",
-                ]
-                .contains(&name.as_str()) =>
+                if ["noscript", "script", "head", "template"].contains(&name.as_str()) =>
             {
                 unimplemented!("{:?}", name);
             }
@@ -633,21 +652,21 @@ impl TreeConstructor {
             false,
         )
     }
-
-    fn insert_element_with_only_add_to_element_stack(
-        &mut self,
-        name: String,
-        attributes: HashMap<String, String>,
-    ) -> NodeId {
-        self.insert(
-            DomNode::new(
-                DomNodeType::Element { name, attributes },
-                self.adjusted_current_node_namespace(),
-            ),
-            true,
-        )
-    }
-
+    /*
+        fn insert_element_with_only_add_to_element_stack(
+            &mut self,
+            name: String,
+            attributes: HashMap<String, String>,
+        ) -> NodeId {
+            self.insert(
+                DomNode::new(
+                    DomNodeType::Element { name, attributes },
+                    self.adjusted_current_node_namespace(),
+                ),
+                true,
+            )
+        }
+    */
     fn insert(&mut self, node: DomNode, only_add_to_element_stack: bool) -> NodeId {
         let is_element = matches!(node.node_type, DomNodeType::Element { .. });
         let adjusted_insertion_location = self.appropriate_place_for_inserting_a_node();

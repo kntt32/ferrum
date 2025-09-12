@@ -12,7 +12,6 @@ use crate::arena::NodeId;
 use crate::render::Color;
 use crate::render::RenderArena;
 use crate::render::RenderNodeType;
-use std::slice::Iter;
 use std::sync::LazyLock;
 
 #[derive(Clone, Debug)]
@@ -30,7 +29,7 @@ impl CssomArena {
 
         static USERAGENT_STYLESHEET: LazyLock<StyleSheet> = LazyLock::new(|| {
             let tokenizer = Tokenizer::new(include_str!("../../../html.css"));
-            let mut parser = Parser::new(tokenizer);
+            let parser = Parser::new(tokenizer);
             parser.parse_a_style_sheet()
         });
 
@@ -43,7 +42,9 @@ impl CssomArena {
 
         for rule in rules {
             match rule {
-                Rule::AtRule(..) => unimplemented!(),
+                Rule::AtRule(..) => {
+                    println!("WARNING: AtRule was ignored at cssom.rs");
+                }
                 Rule::StyleRule(stylerule) => {
                     for s in CssomStyleRule::from_stylerule(stylerule, origin, false) {
                         let id = self.arena.push(s);
@@ -59,7 +60,6 @@ impl CssomArena {
                 .ord
                 .cmp(&self.arena[*rhs].selector.ord)
         });
-        println!("{:?}", self);
     }
 
     pub fn attach_style_for(&self, render_arena: &mut RenderArena, id: NodeId) {
@@ -136,7 +136,10 @@ impl Selector {
                     selectors.push(this);
                     this = Self::new(origin, important);
                 }
-                _ => todo!(),
+                _ => {
+                    println!("WARNING: unimplemented in Selector::from_token");
+                    return None;
+                }
             }
         }
 
@@ -149,11 +152,11 @@ impl Selector {
         if let Some(unit) = iter.next()
             && unit.match_with(render_arena[id].node_type())
         {
-            let Some(i) = render_arena[id].parent() else {
-                return false;
-            };
-            id = i;
             while let Some(unit) = iter.next() {
+                let Some(i) = render_arena[id].parent() else {
+                    return false;
+                };
+                id = i;
                 if unit.match_with(render_arena[id].node_type()) {
                     let Some(i) = render_arena[id].parent() else {
                         return false;

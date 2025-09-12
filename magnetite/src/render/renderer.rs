@@ -3,9 +3,7 @@ use super::Color;
 use super::Font;
 use super::RenderArena;
 use super::RenderNodeType;
-use super::RenderStyle;
 use crate::arena::NodeId;
-use crate::color;
 
 #[derive(Clone, Debug)]
 pub struct Renderer {

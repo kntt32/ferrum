@@ -35,7 +35,7 @@ impl DomArena {
         let mut cssom = CssomArena::new();
         if let Some(style) = self.style() {
             let tokenizer = CssTokenizer::new(style);
-            let mut parser = CssParser::new(tokenizer);
+            let parser = CssParser::new(tokenizer);
             cssom.add_stylesheet(&parser.parse_a_style_sheet(), Origin::Developer);
         }
         cssom

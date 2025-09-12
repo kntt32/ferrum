@@ -6,7 +6,6 @@ use magnetite::arena::*;
 use magnetite::css::CssomArena;
 use magnetite::css::Origin;
 use magnetite::css::Parser;
-use magnetite::css::Token as CssToken;
 use magnetite::css::Tokenizer as CssTokenizer;
 use magnetite::html;
 use magnetite::render::RenderArena;

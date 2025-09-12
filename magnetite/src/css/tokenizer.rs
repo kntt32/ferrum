@@ -59,15 +59,15 @@ impl<'a> Tokenizer<'a> {
     fn is_ident_start_code_point(c: char) -> bool {
         c.is_ascii_alphabetic() || !c.is_ascii() || c == '_'
     }
-
-    fn next_is_ident_start_code_point(&self) -> bool {
-        if let Some(c) = self.look() {
-            Self::is_ident_start_code_point(c)
-        } else {
-            false
+    /*
+        fn next_is_ident_start_code_point(&self) -> bool {
+            if let Some(c) = self.look() {
+                Self::is_ident_start_code_point(c)
+            } else {
+                false
+            }
         }
-    }
-
+    */
     fn is_ident_code_point(c: char) -> bool {
         Self::is_ident_start_code_point(c) || c.is_ascii_digit() || c == '-'
     }
@@ -150,10 +150,6 @@ impl<'a> Tokenizer<'a> {
             }
             Some(c) => c,
         }
-    }
-
-    fn seek(&mut self, len: usize) {
-        self.index += len;
     }
 
     fn skip_whitespace(&mut self) {

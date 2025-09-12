@@ -15,6 +15,7 @@ pub struct Tokenizer<'a> {
     temporary_token: Option<Token>,
     tree_constructor: &'a mut TreeConstructor,
     appropriate_end_tag_name: Option<String>,
+    current_attribute: Option<(String, String)>,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -31,6 +32,7 @@ impl<'a> Tokenizer<'a> {
             temporary_token: None,
             tree_constructor,
             appropriate_end_tag_name: None,
+            current_attribute: None,
         }
     }
 
@@ -40,7 +42,7 @@ impl<'a> Tokenizer<'a> {
 
     fn emit(&mut self, token: Token) {
         if let Token::StartTag { ref name, .. } = token {
-            self.appropriate_end_tag_name = Some(name.to_string());
+            self.appropriate_end_tag_name = Some(name.clone());
         }
         if let Some(state) = self.tree_constructor.handle_token(token) {
             self.switch_to(state);
@@ -96,12 +98,6 @@ impl<'a> Tokenizer<'a> {
         Some(s)
     }
 
-    fn unread_str(&mut self, s: Option<&str>) {
-        if let Some(s) = s {
-            self.string_index -= s.len();
-        }
-    }
-
     fn switch_to(&mut self, state: State) {
         self.state = state;
 
@@ -144,10 +140,318 @@ impl<'a> Tokenizer<'a> {
             State::RawTextLessThanSign => self.step_raw_text_less_than(),
             State::RawTextEndTagOpen => self.step_raw_text_end_tag_open(),
             State::RawTextEndTagName => self.step_raw_text_end_tag_name(),
-            _ => unimplemented!("{:?}", self.state),
+            State::RcData => self.step_rcdata(),
+            State::RcDataLessThanSign => self.step_rcdata_less_than_sign(),
+            State::RcDataEndTagOpen => self.step_rcdata_end_tag_open(),
+            State::RcDataEndTagName => self.step_rcdata_end_tag_name(),
+            State::BeforeAttributeName => self.step_before_attribute_name(),
+            State::AttributeName => self.step_attribute_name(),
+            State::BeforeAttributeValue => self.step_before_attribute_value(),
+            State::AttributeValueDoubleQuoted => self.step_attribute_value_double_quoted(),
+            State::AttributeValueSingleQuoted => self.step_attribute_value_single_quoted(),
+            State::AttributeValueUnquoted => self.step_attribute_value_unquoted(),
+            State::AfterAttributeValueQuoted => self.step_after_attribute_value_quoted(),
+            _ => unimplemented!("{:?}\n{:?}", self.state, &self.string[self.string_index..]),
         }
 
         Some(())
+    }
+
+    fn step_after_attribute_value_quoted(&mut self) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => {
+                self.switch_to(State::BeforeAttributeName);
+            }
+            Some('/') => {
+                self.switch_to(State::SelfClosingStartTag);
+            }
+            Some('>') => {
+                self.switch_to(State::Data);
+                if let Some(current_attribute) = self.current_attribute.take() {
+                    let Some(Token::StartTag {
+                        ref mut attributes, ..
+                    }) = self.temporary_token
+                    else {
+                        panic!();
+                    };
+                    attributes.insert(current_attribute.0, current_attribute.1);
+                }
+                let temporary_token = self.temporary_token.take().unwrap();
+                self.emit(temporary_token);
+            }
+            None => {
+                self.error(ParseError::EofInTag);
+                self.emit(Token::Eof);
+            }
+            c => {
+                self.error(ParseError::MissingWhitespaceBetweenAttributes);
+                self.unread(c);
+                self.switch_to(State::BeforeAttributeName);
+            }
+        }
+    }
+
+    fn step_attribute_value_single_quoted(&mut self) {
+        match self.read() {
+            Some('\'') => {
+                self.switch_to(State::AfterAttributeValueQuoted);
+            }
+            Some('&') => {
+                self.set_return_state(State::AttributeValueDoubleQuoted);
+                self.switch_to(State::CharacterReference);
+            }
+            Some('\0') => {
+                self.error(ParseError::UnexpectedNullCharacter);
+                self.current_attribute.as_mut().unwrap().1.push('\u{fffd}');
+            }
+            None => {
+                self.error(ParseError::EofInTag);
+                self.emit(Token::Eof);
+            }
+            Some(c) => {
+                self.current_attribute.as_mut().unwrap().1.push(c);
+            }
+        }
+    }
+
+    fn step_attribute_value_double_quoted(&mut self) {
+        match self.read() {
+            Some('"') => {
+                self.switch_to(State::AfterAttributeValueQuoted);
+            }
+            Some('&') => {
+                self.set_return_state(State::AttributeValueDoubleQuoted);
+                self.switch_to(State::CharacterReference);
+            }
+            Some('\0') => {
+                self.error(ParseError::UnexpectedNullCharacter);
+                self.current_attribute.as_mut().unwrap().1.push('\u{fffd}');
+            }
+            None => {
+                self.error(ParseError::EofInTag);
+                self.emit(Token::Eof);
+            }
+            Some(c) => {
+                self.current_attribute.as_mut().unwrap().1.push(c);
+            }
+        }
+    }
+
+    fn step_attribute_value_unquoted(&mut self) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => {
+                self.switch_to(State::BeforeAttributeName);
+            }
+            Some('&') => {
+                self.set_return_state(State::AttributeValueUnquoted);
+                self.switch_to(State::CharacterReference);
+            }
+            Some('>') => {
+                self.switch_to(State::Data);
+                if let Some(current_attribute) = self.current_attribute.take() {
+                    let Some(Token::StartTag {
+                        ref mut attributes, ..
+                    }) = self.temporary_token
+                    else {
+                        panic!();
+                    };
+                    attributes.insert(current_attribute.0, current_attribute.1);
+                }
+                let temporary_token = self.temporary_token.take().unwrap();
+                self.emit(temporary_token);
+            }
+            Some('\0') => {
+                self.error(ParseError::UnexpectedNullCharacter);
+                self.current_attribute.as_mut().unwrap().1.push('\u{fffd}');
+            }
+            None => {
+                self.error(ParseError::EofInTag);
+                self.emit(Token::Eof);
+            }
+            Some(c) => {
+                if ['"', '\'', '<', '=', '`'].contains(&c) {
+                    self.error(ParseError::UnexpectedCharacterInUnquotedAttributeValue);
+                }
+                self.current_attribute.as_mut().unwrap().1.push(c);
+            }
+        }
+    }
+
+    fn step_before_attribute_value(&mut self) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => {}
+            Some('"') => {
+                self.switch_to(State::AttributeValueDoubleQuoted);
+            }
+            Some('\'') => {
+                self.switch_to(State::AttributeValueSingleQuoted);
+            }
+            Some('>') => {
+                self.error(ParseError::MissingAttributeValue);
+                self.switch_to(State::Data);
+            }
+            c => {
+                self.unread(c);
+                self.switch_to(State::AttributeValueUnquoted);
+            }
+        }
+    }
+
+    fn step_attribute_name(&mut self) {
+        match self.read() {
+            Some(c)
+                if [
+                    '\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}', '\u{002f}', '\u{003e}',
+                ]
+                .contains(&c) =>
+            {
+                self.unread(Some(c));
+                self.switch_to(State::AfterAttributeName);
+            }
+            None => {
+                self.unread(None);
+                self.switch_to(State::AfterAttributeName);
+            }
+            Some('=') => {
+                self.switch_to(State::BeforeAttributeValue);
+            }
+            Some('\0') => {
+                self.error(ParseError::UnexpectedNullCharacter);
+                self.current_attribute.as_mut().unwrap().0.push('\u{fffd}');
+            }
+            Some(mut c) => {
+                if ['"', '\'', '<'].contains(&c) {
+                    self.error(ParseError::UnexpectedCharacterInAttributeName);
+                }
+                c.make_ascii_lowercase();
+                self.current_attribute.as_mut().unwrap().0.push(c);
+            }
+        }
+    }
+
+    fn step_before_attribute_name(&mut self) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => {}
+            c if [Some('/'), Some('>'), None].contains(&c) => {
+                self.unread(c);
+                self.switch_to(State::AfterAttributeName);
+            }
+            Some('=') => {
+                self.error(ParseError::UnexpectedEqualsSignBeforeAttributeName);
+                todo!()
+            }
+            c => {
+                if let Some(current_attribute) = self.current_attribute.take() {
+                    let Some(Token::StartTag { attributes, .. }) = &mut self.temporary_token else {
+                        panic!();
+                    };
+                    attributes.insert(current_attribute.0, current_attribute.1);
+                }
+                self.current_attribute = Some((String::new(), String::new()));
+                self.unread(c);
+                self.switch_to(State::AttributeName);
+            }
+        }
+    }
+
+    fn step_rcdata_end_tag_name(&mut self) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', ' ', '/', '>'].contains(&c) => {
+                let Token::EndTag { name, .. } = self.temporary_token.as_ref().unwrap() else {
+                    panic!();
+                };
+                if Some(name) == self.appropriate_end_tag_name.as_ref() {
+                    match c {
+                        '/' => {
+                            self.switch_to(State::SelfClosingStartTag);
+                        }
+                        '>' => {
+                            let token = self.temporary_token.take().unwrap();
+                            self.emit(token);
+                            self.switch_to(State::Data);
+                        }
+                        _ => {
+                            self.switch_to(State::BeforeAttributeName);
+                        }
+                    }
+                } else {
+                    self.emit(Token::Character('<'));
+                    self.emit(Token::Character('/'));
+                    self.flush();
+                    self.unread(Some(c));
+                    self.switch_to(State::RcData);
+                }
+            }
+            Some(mut c) if c.is_ascii_alphabetic() => {
+                self.temporary_buffer.push(c);
+                c.make_ascii_lowercase();
+                let Some(Token::EndTag { ref mut name }) = self.temporary_token else {
+                    panic!();
+                };
+                name.push(c);
+            }
+            c => {
+                self.emit(Token::Character('<'));
+                self.emit(Token::Character('/'));
+                self.flush();
+                self.unread(c);
+                self.switch_to(State::RcData);
+            }
+        }
+    }
+
+    fn step_rcdata_end_tag_open(&mut self) {
+        match self.read() {
+            Some(c) if c.is_ascii_alphabetic() => {
+                self.temporary_token = Some(Token::EndTag {
+                    name: String::new(),
+                });
+                self.unread(Some(c));
+                self.switch_to(State::RcDataEndTagName);
+            }
+            c => {
+                self.emit(Token::Character('<'));
+                self.emit(Token::Character('/'));
+                self.unread(c);
+                self.switch_to(State::RcData);
+            }
+        }
+    }
+
+    fn step_rcdata_less_than_sign(&mut self) {
+        match self.read() {
+            Some('/') => {
+                self.temporary_buffer.clear();
+                self.switch_to(State::RcDataEndTagOpen);
+            }
+            c => {
+                self.emit(Token::Character('<'));
+                self.unread(c);
+                self.switch_to(State::RcData);
+            }
+        }
+    }
+
+    fn step_rcdata(&mut self) {
+        match self.read() {
+            Some('&') => {
+                self.set_return_state(State::RcData);
+                self.switch_to(State::CharacterReference);
+            }
+            Some('<') => {
+                self.switch_to(State::RcDataLessThanSign);
+            }
+            Some('\0') => {
+                self.error(ParseError::UnexpectedNullCharacter);
+                self.emit(Token::Character('\u{fffd}'));
+            }
+            None => {
+                self.emit(Token::Eof);
+            }
+            Some(c) => {
+                self.emit(Token::Character(c));
+            }
+        }
     }
 
     fn step_raw_text_end_tag_name(&mut self) {
@@ -343,7 +647,7 @@ impl<'a> Tokenizer<'a> {
                 self.emit(Token::Eof);
             }
             Some(c) => {
-                self.error(ParseError::MissingWhitespceBeforeDoctypeName);
+                self.error(ParseError::MissingWhiteSpaceBeforeDoctypeName);
                 self.unread(Some(c));
                 self.switch_to(State::BeforeDoctypeName);
             }
@@ -530,7 +834,7 @@ pub enum ParseError {
     IncorrectlyOpenedComment,
     EofInDoctype,
     EofInText,
-    MissingWhitespceBeforeDoctypeName,
+    MissingWhiteSpaceBeforeDoctypeName,
     MissingDoctypeName,
     UnexpectedHeadTag,
     UnclosedElementAtEof,
@@ -539,6 +843,12 @@ pub enum ParseError {
     ElementNotFoundInButtonScope,
     HtmlEndTagInFragmentParse,
     UnexpectedTokenInAfterAfterBody,
+    UnexpectedEqualsSignBeforeAttributeName,
+    MissingWhitespaceBetweenAttributes,
+    UnexpectedCharacterInUnquotedAttributeValue,
+    MissingAttributeValue,
+    UnexpectedCharacterInAttributeValue,
+    UnexpectedCharacterInAttributeName,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -579,6 +889,7 @@ pub enum TokenizerState {
     BeforeAttributeValue,
     AttributeValueDoubleQuoted,
     AttributeValueSingleQuoted,
+    AttributeValueUnquoted,
     AttributeValue,
     AfterAttributeValueQuoted,
     SelfClosingStartTag,

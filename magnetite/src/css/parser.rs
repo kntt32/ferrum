@@ -49,7 +49,8 @@ impl<'a> Parser<'a> {
         self.stylesheet = Some(StyleSheet::new());
         self.top_level_flag = true;
         self.consume_a_list_of_rules();
-        self.stylesheet.take().unwrap()
+        let stylesheet = self.stylesheet.take().unwrap();
+        stylesheet
     }
 
     fn consume_a_list_of_rules(&mut self) {
@@ -66,7 +67,6 @@ impl<'a> Parser<'a> {
                 }
                 Token::AtKeyword(..) => {
                     self.reconsume(token);
-                    self.consume_an_at_rule();
                     if let Some(rule) = self.consume_an_at_rule() {
                         self.stylesheet().rules.push(Rule::AtRule(rule));
                     }
@@ -82,7 +82,30 @@ impl<'a> Parser<'a> {
     }
 
     fn consume_an_at_rule(&mut self) -> Option<AtRule> {
-        todo!()
+        let Some(Token::AtKeyword(name)) = self.consume() else {
+            panic!();
+        };
+        let mut at_rule = AtRule::new(name);
+        while let Some(token) = self.consume() {
+            match token {
+                Token::Semicolon => {
+                    return Some(at_rule);
+                }
+                Token::LCurly => {
+                    at_rule.rule.block = self.consume_a_simple_block(Token::LCurly);
+                    return Some(at_rule);
+                }
+                _ => {
+                    self.reconsume(token);
+                    at_rule
+                        .rule
+                        .prelude
+                        .append(&mut self.consume_a_component_value());
+                }
+            }
+        }
+        self.error(ParseError::UnexpectedEof);
+        None
     }
 
     fn consume_a_qualified_rule(&mut self) -> Option<StyleRule> {
@@ -101,7 +124,6 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-
         self.error(ParseError::UnexpectedEof);
         None
     }
@@ -137,7 +159,9 @@ impl<'a> Parser<'a> {
     }
 
     fn consume_a_function(&mut self) -> Vec<Token> {
-        todo!()
+        // TODO
+        println!("WARNING: not yet implemented");
+        Vec::new()
     }
 }
 
@@ -171,7 +195,19 @@ pub enum Rule {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct AtRule {}
+pub struct AtRule {
+    name: String,
+    rule: StyleRule,
+}
+
+impl AtRule {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            rule: StyleRule::new(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StyleRule {

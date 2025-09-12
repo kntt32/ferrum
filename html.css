@@ -30,3 +30,8 @@ h6 {
 p {
 
 }
+
+a {
+    color: blue,
+    text-decoration-line: underline,
+}
