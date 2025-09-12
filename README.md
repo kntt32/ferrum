@@ -5,6 +5,8 @@
 [![Rust](https://github.com/kntt32/ferrum/actions/workflows/rust.yml/badge.svg)](https://github.com/kntt32/ferrum/actions/workflows/rust.yml)
 ![Html](https://img.shields.io/badge/HTML-living_standard-blue?logo=HTML5)
 
+<img width="400" height="300" alt="IMG_8742" src="https://github.com/user-attachments/assets/9f3f0a7a-11d5-4fa1-bce1-cb1df5fa237f" />
+
 a browser and a rendering engine abide by WHATWG HTML living standard written by Rust
 
 ## References
