@@ -5,7 +5,6 @@ use ab_glyph::FontRef;
 use ab_glyph::Glyph;
 use ab_glyph::Rect;
 use ab_glyph::ScaleFont as AbScaleFont;
-use ab_glyph::VariableFont;
 use std::sync::LazyLock;
 
 static DEFAULT_FONT: LazyLock<Font<FontRef<'static>>> = LazyLock::new(|| {
