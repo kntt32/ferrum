@@ -8,7 +8,7 @@ use std::io::Write;
 use std::net::TcpStream;
 
 fn main() {
-    const addr: &str = "http://www.example.com/";
+    const addr: &str = "http://www.google.com/";
 
     let url: Url<'_> = addr.try_into().unwrap();
     println!("{:?}", url);
@@ -26,4 +26,5 @@ fn main() {
     tcp.read_to_end(&mut response_message).unwrap();
     let response = HttpResponse::from_bytes(&response_message).unwrap();
     println!("{:?}", response);
+    println!("{}", str::from_utf8(response.content()).unwrap());
 }

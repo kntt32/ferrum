@@ -28,6 +28,10 @@ impl HttpRequest {
         }
     }
 
+    pub fn header(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
     pub fn push_header(&mut self, name: String, value: String) {
         self.headers.insert(name, value);
     }
@@ -70,17 +74,21 @@ pub struct HttpResponse {
 }
 
 impl HttpResponse {
+    pub fn headers(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
+
+    pub fn content(&self) -> &[u8] {
+        &self.content
+    }
+
+    pub fn take(self) -> Vec<u8> {
+        self.content
+    }
+
     pub fn from_bytes(bytes: &[u8]) -> HttpResult<Self> {
-        let mut i = 0;
-        let (http_header, content) = loop {
-            if bytes.len() - 1 <= i {
-                return Err("invalid response");
-            }
-            if bytes[i] == b'\n' && bytes[i + 1] == b'\n' {
-                break bytes.split_at(i + 1);
-            }
-            i += 1;
-        };
+        let (http_header, content) = Self::split_header_and_content(bytes)?;
+
         let http_header = str::from_utf8(http_header).map_err(|_| "invalid codepoint")?;
         let (response_line, headers_part) = http_header.split_once('\n').unwrap();
         let (version, remaining) = response_line
@@ -90,14 +98,62 @@ impl HttpResponse {
             .split_once(|c: char| c.is_ascii_whitespace())
             .ok_or("expected status")?;
         let note = remaining;
+        let headers = Self::parse_headers(headers_part)?;
 
         Ok(Self {
             version: version.trim().into(),
             status: status.trim().parse()?,
             note: note.trim().into(),
-            headers: Self::parse_headers(headers_part)?,
-            content: content.into(),
+            content: if let Some(ref s) = headers.get("Transfer-Encoding")
+                && s.as_str() == "chunked"
+            {
+                Self::load_chunk_content(content)
+            } else {
+                content.into()
+            },
+            headers,
         })
+    }
+
+    fn load_chunk_content(mut content: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+
+        while !content.is_empty() {
+            let mut iter = content.splitn(2, |b| b == &b'\n');
+            if let Some(line_u8) = iter.next()
+                && let Ok(line) = str::from_utf8(line_u8)
+                && let Ok(len) = usize::from_str_radix(line.trim(), 16)
+                && len != 0
+                && let Some(slice) = content.get(..len)
+            {
+                content = iter.next().unwrap_or(&[]);
+                if let Some(slice) = content.get(..len) {
+                    bytes.extend_from_slice(slice);
+                    content = &content[len..];
+                }
+            } else {
+                break;
+            }
+        }
+
+        bytes
+    }
+
+    fn split_header_and_content(bytes: &[u8]) -> HttpResult<(&[u8], &[u8])> {
+        let mut i = 0;
+
+        loop {
+            if bytes.len() - 2 < i {
+                break Err("invalid response");
+            }
+            if &bytes[i..i + 2] == b"\n\n" {
+                break Ok(bytes.split_at(i + 1));
+            }
+            if i <= bytes.len() - 4 && &bytes[i..i + 4] == b"\r\n\r\n" {
+                break Ok(bytes.split_at(i + 4));
+            }
+            i += 1;
+        }
     }
 
     fn parse_headers(s: &str) -> HttpResult<HashMap<String, String>> {
