@@ -1,14 +1,19 @@
 use std::net::IpAddr;
+use std::net::Ipv4Addr;
 use std::net::UdpSocket;
 
-pub fn get_host_addr(host: &str) -> DnsResult<IpAddr> {
+pub type DnsResult<T> = Result<T, &'static str>;
+
+pub const CLOUDFLARE_DNS: IpAddr = IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1));
+
+pub fn get_host_addr(host: &str, dns: IpAddr) -> DnsResult<IpAddr> {
     let mut question_packet = DnsPacket::question();
     question_packet.push_question(host.into());
     let bytes = question_packet.to_bytes()?;
 
     let udp_socket = UdpSocket::bind("0.0.0.0:0").map_err(|_| "failed to bind udp socket")?;
     udp_socket
-        .connect("1.1.1.1:53")
+        .connect((dns, 53))
         .map_err(|_| "failed to connect to dns server")?;
     udp_socket
         .send(&bytes)
@@ -25,8 +30,6 @@ pub fn get_host_addr(host: &str) -> DnsResult<IpAddr> {
         .get_ipaddr(host)
         .ok_or("entry not found in response")
 }
-
-pub type DnsResult<T> = Result<T, &'static str>;
 
 #[derive(Clone, Debug)]
 pub struct DnsPacket {
