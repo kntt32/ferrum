@@ -1,3 +1,3 @@
 [workspace]
 resolver = "3"
-members = [ "copper","ferrum", "magnetite"]
+members = [ "aqua", "copper","ferrum", "magnetite"]

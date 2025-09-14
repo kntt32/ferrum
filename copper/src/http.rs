@@ -42,10 +42,10 @@ impl HttpRequest {
 
     pub fn header_as_string(&self) -> String {
         let url = Url::new(&self.url).unwrap();
-        let mut string = format!("{} {} {}\n", self.method, url.path(), self.version);
+        let mut string = format!("{} {} {}\r\n", self.method, url.path(), self.version);
         for header in &self.headers {
             let (key, value) = header;
-            string += &format!("{}: {}\n", key, value);
+            string += &format!("{}: {}\r\n", key, value);
         }
 
         string
@@ -54,6 +54,7 @@ impl HttpRequest {
     pub fn as_bytes(&self) -> Vec<u8> {
         let mut bytes = self.header_as_string().into_bytes();
 
+        bytes.push(b'\r');
         bytes.push(b'\n');
 
         if let Some(ref content) = self.content {
@@ -74,6 +75,10 @@ pub struct HttpResponse {
 }
 
 impl HttpResponse {
+    pub fn statue(&self) -> Status {
+        self.status
+    }
+
     pub fn headers(&self) -> &HashMap<String, String> {
         &self.headers
     }
