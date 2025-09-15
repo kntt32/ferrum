@@ -1,3 +1,4 @@
+use magnetite::css::CssomArena;
 use magnetite::html::*;
 use magnetite::render::*;
 use softbuffer::Context;
@@ -80,6 +81,7 @@ pub struct Ferrum {
     window: Option<Rc<Window>>,
     surface: Option<Surface<Rc<Window>, Rc<Window>>>,
     dom: DomArena,
+    cssom: CssomArena,
     renderer: Renderer,
 }
 
@@ -95,7 +97,9 @@ impl Ferrum {
             }
         }
         let dom = tree_constructor.take_dom();
-        let render_arena = RenderArena::new(&dom);
+        let cssom = dom.cssom();
+        let render_arena =
+            RenderArena::new(&dom, &cssom, width.get() as usize, height.get() as usize);
         let renderer = Renderer::new(render_arena);
 
         Self {
@@ -105,12 +109,22 @@ impl Ferrum {
             surface: None,
             dom,
             renderer,
+            cssom,
         }
     }
 
     fn resize(&mut self, width: NonZeroU32, height: NonZeroU32) {
         self.width = width;
         self.height = height;
+
+        let render_arena = RenderArena::new(
+            &self.dom,
+            &self.cssom,
+            width.get() as usize,
+            height.get() as usize,
+        );
+        let renderer = Renderer::new(render_arena);
+        self.renderer = renderer;
 
         let window = self.window.as_ref().unwrap().clone();
         let context = Context::new(window.clone()).unwrap();

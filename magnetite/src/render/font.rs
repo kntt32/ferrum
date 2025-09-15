@@ -99,7 +99,7 @@ impl<F: AbFont> Font<F> {
     }
 
     pub fn glyph(&self, c: char, size: f32) -> Glyph {
-        self.font.glyph_id(c).with_scale(size * 2.5)
+        self.font.glyph_id(c).with_scale(size * 1.5)
     }
 
     pub fn layout(&self, glyph: &Glyph) -> Layout {

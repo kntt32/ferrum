@@ -160,7 +160,6 @@ impl<'a> Parser<'a> {
 
     fn consume_a_function(&mut self) -> Vec<Token> {
         // TODO
-        println!("WARNING: not yet implemented");
         Vec::new()
     }
 }
