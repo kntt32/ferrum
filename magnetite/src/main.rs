@@ -90,7 +90,8 @@ fn html_demo() {
     println!("{:?}", dom);
     println!("{:?}", dom.style());
 
-    let render_arena = RenderArena::new(&dom, 400, 300);
+    let cssom = dom.cssom();
+    let render_arena = RenderArena::new(&dom, &cssom, 400, 300);
     println!("{:?}", render_arena);
 
     let cssom = dom.cssom();
