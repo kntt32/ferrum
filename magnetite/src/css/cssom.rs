@@ -212,6 +212,8 @@ pub struct CssomStyle {
     pub margin_right: Option<Value>,
     pub margin_bottom: Option<Value>,
     pub margin_left: Option<Value>,
+    pub width: Option<Value>,
+    pub height: Option<Value>,
 }
 
 impl CssomStyle {
@@ -224,6 +226,8 @@ impl CssomStyle {
             margin_right: None,
             margin_bottom: None,
             margin_left: None,
+            width: None,
+            height: None,
         }
     }
 
@@ -272,6 +276,12 @@ impl CssomStyle {
                 "margin" => {
                     this.parse_margin(iter);
                 }
+                "width" => {
+                    this.parse_width(iter);
+                }
+                "height" => {
+                    this.parse_height(iter);
+                }
                 _ => continue,
             }
         }
@@ -279,10 +289,22 @@ impl CssomStyle {
         Some(this)
     }
 
+    fn parse_width<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
+        if let Some(width) = Self::parse_part_value(&mut iter) {
+            self.width = Some(width);
+        }
+    }
+
+    fn parse_height<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
+        if let Some(height) = Self::parse_part_value(&mut iter) {
+            self.height = Some(height);
+        }
+    }
+
     fn parse_margin<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
         let mut values = Vec::new();
         for _ in 0..4 {
-            if let Some(value) = self.parse_part_value(&mut iter) {
+            if let Some(value) = Self::parse_part_value(&mut iter) {
                 values.push(value);
             }
         }
@@ -318,47 +340,44 @@ impl CssomStyle {
     }
 
     fn parse_margin_right<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        if let Some(margin_right) = self.parse_part_value(&mut iter) {
+        if let Some(margin_right) = Self::parse_part_value(&mut iter) {
             self.margin_right = Some(margin_right);
         }
     }
 
     fn parse_margin_bottom<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        if let Some(margin_bottom) = self.parse_part_value(&mut iter) {
+        if let Some(margin_bottom) = Self::parse_part_value(&mut iter) {
             self.margin_bottom = Some(margin_bottom);
         }
     }
 
     fn parse_margin_left<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        if let Some(margin_left) = self.parse_part_value(&mut iter) {
+        if let Some(margin_left) = Self::parse_part_value(&mut iter) {
             self.margin_left = Some(margin_left);
         }
     }
 
     fn parse_margin_top<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        if let Some(margin_top) = self.parse_part_value(&mut iter) {
+        if let Some(margin_top) = Self::parse_part_value(&mut iter) {
             self.margin_top = Some(margin_top);
         }
     }
 
     fn parse_background_color<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        self.background_color = self.parse_part_color(&mut iter).or(self.background_color);
+        self.background_color = Self::parse_part_color(&mut iter).or(self.background_color);
     }
 
     fn parse_background<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        self.background_color = self.parse_part_color(&mut iter).or(self.background_color);
+        self.background_color = Self::parse_part_color(&mut iter).or(self.background_color);
     }
 
     fn parse_font_size<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        if let Some(font_size) = self.parse_part_value(&mut iter) {
+        if let Some(font_size) = Self::parse_part_value(&mut iter) {
             self.font_size = Some(font_size);
         }
     }
 
-    fn parse_part_value<'a>(
-        &mut self,
-        iter: &mut impl Iterator<Item = &'a Token>,
-    ) -> Option<Value> {
+    fn parse_part_value<'a>(iter: &mut impl Iterator<Item = &'a Token>) -> Option<Value> {
         match iter.next() {
             Some(Token::Dimension { value, unit }) => Value::from(*value, unit),
             Some(Token::Ident(ident)) if ident.as_str() == "auto" => Some(Value::Auto),
@@ -366,10 +385,7 @@ impl CssomStyle {
         }
     }
 
-    fn parse_part_color<'a>(
-        &mut self,
-        iter: &mut impl Iterator<Item = &'a Token>,
-    ) -> Option<Color> {
+    fn parse_part_color<'a>(iter: &mut impl Iterator<Item = &'a Token>) -> Option<Color> {
         match iter.next() {
             Some(Token::Ident(name)) => Color::from_name(name).ok(),
             Some(Token::Hash { value, .. }) => Color::from_str_noprefix(value).ok(),
@@ -378,7 +394,7 @@ impl CssomStyle {
     }
 
     fn parse_color<'a>(&mut self, mut iter: impl Iterator<Item = &'a Token>) {
-        self.color = self.parse_part_color(&mut iter).or(self.color);
+        self.color = Self::parse_part_color(&mut iter).or(self.color);
     }
 }
 

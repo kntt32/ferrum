@@ -97,6 +97,16 @@ impl RenderArena {
                     .as_ref()
                     .map(|value| value.as_pixel(self, id))
                     .unwrap_or(self[id].style.margin_left);
+                self[id].style.width = cssom_style
+                    .width
+                    .as_ref()
+                    .map(|value| value.as_pixel(self, id) as usize)
+                    .or(self[id].style.width);
+                self[id].style.height = cssom_style
+                    .height
+                    .as_ref()
+                    .map(|value| value.as_pixel(self, id) as usize)
+                    .or(self[id].style.height);
             }
         }
     }
