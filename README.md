@@ -18,4 +18,5 @@ A browser and a rendering engine abide by WHATWG HTML living standard written by
 ## References
 - html living standard: https://html.spec.whatwg.org/multipage/
 - css syntax module: https://www.w3.org/TR/css-syntax-3/
+- css2.2 spec: https://www.w3.org/TR/CSS22/
 - とほほのWWW入門: https://www.tohoho-web.com/www.htm
