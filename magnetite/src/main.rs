@@ -8,7 +8,7 @@ use magnetite::css::Origin;
 use magnetite::css::Parser;
 use magnetite::css::Tokenizer as CssTokenizer;
 use magnetite::html;
-use magnetite::render::RenderArena;
+// use magnetite::render::RenderArena;
 use std::io::Cursor;
 
 fn main() {
@@ -91,8 +91,8 @@ fn html_demo() {
     println!("{:?}", dom.style());
 
     let cssom = dom.cssom();
-    let render_arena = RenderArena::new(&dom, &cssom, 400, 300);
-    println!("{:?}", render_arena);
+    // let render_arena = RenderArena::new(&dom, &cssom, 400, 300);
+    // println!("{:?}", render_arena);
 
     let cssom = dom.cssom();
     println!("{:?}", cssom);

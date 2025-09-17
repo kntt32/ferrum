@@ -166,3 +166,63 @@ macro_rules! color {
         Color::from_str_noprefix(stringify!($x)).unwrap()
     };
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AlphaColor {
+    color: Color,
+    alpha: f32,
+}
+
+impl From<Color> for AlphaColor {
+    fn from(color: Color) -> Self {
+        Self { color, alpha: 1.0 }
+    }
+}
+
+impl AlphaColor {
+    pub const TRANSPARENT: Self = Self {
+        color: Color::WHITE,
+        alpha: 0.0,
+    };
+
+    pub const NAMED_ALPHACOLOR: &[(&str, Self)] = &[("transparent", Self::TRANSPARENT)];
+
+    pub fn new(color: Color, alpha: f32) -> Self {
+        if 0.0 <= alpha && alpha <= 1.0 {
+            Self { color, alpha }
+        } else {
+            panic!("alpha must be in 0.0 ..= 1.0")
+        }
+    }
+
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        for (aname, acolor) in Self::NAMED_ALPHACOLOR {
+            if *aname == name {
+                return Ok(*acolor);
+            }
+        }
+
+        Ok(Self {
+            color: Color::from_name(name)?,
+            alpha: 1.0,
+        })
+    }
+
+    pub fn from_str_noprefix(s: &str) -> Result<Self, String> {
+        Ok(Self {
+            color: Color::from_str_noprefix(s)?,
+            alpha: 1.0,
+        })
+    }
+}
+
+impl FromStr for AlphaColor {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            color: Color::from_str(s)?,
+            alpha: 1.0,
+        })
+    }
+}
