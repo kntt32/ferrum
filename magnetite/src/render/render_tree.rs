@@ -1,12 +1,14 @@
+use super::AlphaColor;
+use super::Color;
 use super::Font;
 use super::Layout;
 use crate::arena::Arena;
 use crate::arena::NodeId;
 use crate::css::CssStyle;
 use crate::css::CssomArena;
+use crate::css::Display;
 use crate::html::DomArena;
 use crate::html::DomNodeType;
-use crate::render::Color;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -28,8 +30,53 @@ impl RenderArena {
         };
         this.build_tree(dom);
         this.apply_css_style(cssom);
+        this.calc_render_style();
 
         this
+    }
+
+    fn calc_render_style(&mut self) {
+        self.calc_render_style_for(0);
+    }
+
+    fn calc_render_style_for(&mut self, id: NodeId) {
+        let css_style = &self[id].css_style;
+
+        let font_size = css_style.font_size.unwrap().compute(self, id).unwrap();
+        let color = css_style.color.unwrap();
+        let background_color = css_style.background_color.unwrap();
+        let padding_top = css_style.padding_top.unwrap().compute(self, id).unwrap();
+        let padding_right = css_style.padding_right.unwrap().compute(self, id).unwrap();
+        let padding_bottom = css_style.padding_bottom.unwrap().compute(self, id).unwrap();
+        let padding_left = css_style.padding_left.unwrap().compute(self, id).unwrap();
+
+        let (used_width, used_margin) = self.calc_width_and_margin(id);
+        let (used_margin_top, used_margin_right, used_margin_bottom, used_margin_left) =
+            used_margin;
+
+        todo!()
+    }
+
+    fn calc_width_and_margin(&self, id: NodeId) -> (f32, (f32, f32, f32, f32)) {
+        let css_style = &self[id].css_style;
+
+        let used_width: f32;
+        let used_margin: (f32, f32, f32, f32);
+
+        match (
+            css_style.display.unwrap(),
+            self[id].node_type.is_replace_element(),
+        ) {
+            (Display::Block, false) => {
+                todo!()
+            }
+            (Display::Inline, false) => {
+                todo!()
+            }
+            _ => todo!(),
+        }
+
+        (used_width, used_margin)
     }
 
     fn apply_css_style(&mut self, cssom: &CssomArena) {
@@ -103,7 +150,7 @@ impl RenderArena {
                         );
                     }
                 }
-                ref nt => {}
+                _ => {}
             }
         }
     }
@@ -125,8 +172,9 @@ impl DerefMut for RenderArena {
 
 #[derive(Clone, Debug)]
 pub struct RenderNode {
-    node_type: NodeType,
+    pub node_type: NodeType,
     pub css_style: CssStyle,
+    pub style: Option<RenderStyle>,
 }
 
 impl RenderNode {
@@ -134,6 +182,7 @@ impl RenderNode {
         Self {
             node_type,
             css_style,
+            style: None,
         }
     }
 
@@ -144,11 +193,16 @@ impl RenderNode {
                 attributes,
             },
             css_style: CssStyle::default(),
+            style: None,
         }
     }
 
     pub fn node_type(&self) -> &NodeType {
         &self.node_type
+    }
+
+    pub fn style(&self) -> &RenderStyle {
+        self.style.as_ref().expect("failed to get RenderNode.style")
     }
 }
 
@@ -161,5 +215,25 @@ pub enum RenderNodeType {
     Text(String),
 }
 
+impl RenderNodeType {
+    pub fn is_replace_element(&self) -> bool {
+        matches!(self, Self::Element{name, ..} if ["img"].contains(&name.as_str()))
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
-pub struct RenderStyle {}
+pub struct RenderStyle {
+    pub font_size: f32,
+    pub color: AlphaColor,
+    pub background_color: AlphaColor,
+    pub used_margin_top: f32,
+    pub used_margin_right: f32,
+    pub used_margin_bottom: f32,
+    pub used_margin_left: f32,
+    pub padding_top: f32,
+    pub padding_right: f32,
+    pub padding_bottom: f32,
+    pub padding_left: f32,
+    pub used_width: f32,
+    pub used_height: f32,
+}
