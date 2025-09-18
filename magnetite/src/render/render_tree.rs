@@ -1,7 +1,6 @@
 use super::AlphaColor;
 use super::Color;
 use super::Font;
-use super::Layout;
 use crate::arena::Arena;
 use crate::arena::NodeId;
 use crate::css::CssStyle;
@@ -42,41 +41,20 @@ impl RenderArena {
     fn calc_render_style_for(&mut self, id: NodeId) {
         let css_style = &self[id].css_style;
 
-        let font_size = css_style.font_size.unwrap().compute(self, id).unwrap();
-        let color = css_style.color.unwrap();
-        let background_color = css_style.background_color.unwrap();
-        let padding_top = css_style.padding_top.unwrap().compute(self, id).unwrap();
-        let padding_right = css_style.padding_right.unwrap().compute(self, id).unwrap();
-        let padding_bottom = css_style.padding_bottom.unwrap().compute(self, id).unwrap();
-        let padding_left = css_style.padding_left.unwrap().compute(self, id).unwrap();
+        self[id].style = Some(RenderStyle {
+            font_size: css_style.font_size.unwrap().compute(self, id).unwrap(),
+            color: css_style.color.unwrap().compute().unwrap(),
+            background_color: css_style.background_color.unwrap().compute().unwrap(),
+            padding_top: css_style.padding_top.unwrap().compute(self, id).unwrap(),
+            padding_right: css_style.padding_right.unwrap().compute(self, id).unwrap(),
+            padding_bottom: css_style.padding_bottom.unwrap().compute(self, id).unwrap(),
+            padding_left: css_style.padding_left.unwrap().compute(self, id).unwrap(),
+        });
 
-        let (used_width, used_margin) = self.calc_width_and_margin(id);
-        let (used_margin_top, used_margin_right, used_margin_bottom, used_margin_left) =
-            used_margin;
-
-        todo!()
-    }
-
-    fn calc_width_and_margin(&self, id: NodeId) -> (f32, (f32, f32, f32, f32)) {
-        let css_style = &self[id].css_style;
-
-        let used_width: f32;
-        let used_margin: (f32, f32, f32, f32);
-
-        match (
-            css_style.display.unwrap(),
-            self[id].node_type.is_replace_element(),
-        ) {
-            (Display::Block, false) => {
-                todo!()
-            }
-            (Display::Inline, false) => {
-                todo!()
-            }
-            _ => todo!(),
+        let children: Vec<_> = self.children(id).collect();
+        for child in children {
+            self.calc_render_style_for(child);
         }
-
-        (used_width, used_margin)
     }
 
     fn apply_css_style(&mut self, cssom: &CssomArena) {
@@ -226,14 +204,8 @@ pub struct RenderStyle {
     pub font_size: f32,
     pub color: AlphaColor,
     pub background_color: AlphaColor,
-    pub used_margin_top: f32,
-    pub used_margin_right: f32,
-    pub used_margin_bottom: f32,
-    pub used_margin_left: f32,
     pub padding_top: f32,
     pub padding_right: f32,
     pub padding_bottom: f32,
     pub padding_left: f32,
-    pub used_width: f32,
-    pub used_height: f32,
 }

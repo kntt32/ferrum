@@ -8,11 +8,12 @@ use magnetite::css::Origin;
 use magnetite::css::Parser;
 use magnetite::css::Tokenizer as CssTokenizer;
 use magnetite::html;
-// use magnetite::render::RenderArena;
+use magnetite::render::RenderArena;
 use std::io::Cursor;
 
 fn main() {
-    html_demo();
+    // html_demo();
+    println!("{:?}", CssomArena::new());
 }
 
 #[allow(unused)]

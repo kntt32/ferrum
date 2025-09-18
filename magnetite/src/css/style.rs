@@ -69,7 +69,7 @@ impl CssStyle {
 
         let len = tokens.len();
         let mut i = 0;
-        while i < tokens.len() {
+        while i + 2 < tokens.len() {
             let next_i =
                 i + tokens[i..].partition_point(|token| !matches!(token, Token::Semicolon)) + 1;
 
@@ -77,7 +77,8 @@ impl CssStyle {
                 i = next_i;
                 continue;
             };
-            if tokens[i] != Token::Colon {
+
+            if tokens[i + 1] != Token::Colon {
                 i = next_i;
                 continue;
             }
@@ -150,8 +151,10 @@ impl CssStyle {
                 "height" => {
                     this.height = Height::from(value).or(this.height);
                 }
-                _ => continue,
+                _ => {}
             }
+
+            i = next_i;
         }
 
         Some(this)
@@ -185,6 +188,7 @@ impl CssStyle {
 pub enum Display {
     Block,
     Inline,
+    InlineBlock,
 }
 
 impl Display {
@@ -193,6 +197,7 @@ impl Display {
             match ident.as_str() {
                 "block" => Some(Self::Block),
                 "inline" => Some(Self::Inline),
+                "inline-block" => Some(Self::InlineBlock),
                 _ => None,
             }
         } else {
@@ -216,6 +221,12 @@ impl ForegroundColor {
             _ => None,
         }
     }
+
+    pub fn compute(&self) -> ComputedValue<AlphaColor> {
+        match self {
+            Self::Color(color) => ComputedValue::Value(*color),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -231,6 +242,12 @@ impl BackgroundColor {
                 Some(Self::Color(AlphaColor::from_str_noprefix(value).ok()?))
             }
             _ => None,
+        }
+    }
+
+    pub fn compute(&self) -> ComputedValue<AlphaColor> {
+        match self {
+            Self::Color(color) => ComputedValue::Value(*color),
         }
     }
 }
@@ -336,7 +353,7 @@ impl Padding {
         }
     }
 
-    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue {
+    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue<f32> {
         match self {
             Self::Length(length) => length.compute(render_arena, id),
         }
@@ -388,7 +405,7 @@ impl FontSize {
         }
     }
 
-    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue {
+    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue<f32> {
         match self {
             Self::Length(length) => length.compute(render_arena, id),
         }
@@ -410,7 +427,7 @@ impl Length {
         }
     }
 
-    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue {
+    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue<f32> {
         match self {
             Self::Pixel(num) => ComputedValue::Value(num.as_floating() as f32),
             Self::Em(num) => {
@@ -426,21 +443,21 @@ impl Length {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum ComputedValue {
-    Value(f32),
+pub enum ComputedValue<T> {
+    Value(T),
     Auto,
 }
 
-impl ComputedValue {
+impl<T> ComputedValue<T> {
     pub fn is_value(&self) -> bool {
         matches!(self, Self::Value(..))
     }
 
     pub fn is_auto(&self) -> bool {
-        self == &Self::Auto
+        matches!(self, Self::Auto)
     }
 
-    pub fn unwrap(self) -> f32 {
+    pub fn unwrap(self) -> T {
         if let Self::Value(value) = self {
             value
         } else {

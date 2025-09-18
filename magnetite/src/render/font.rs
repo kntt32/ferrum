@@ -42,7 +42,7 @@ impl<F: AbFont> Font<F> {
         glyphs
     }
 
-    pub fn layout_str(&self, glyphs: &[Glyph]) -> Layout {
+    pub fn layout_str(&self, glyphs: &[Glyph]) -> GlyphLayout {
         let mut x = 0.0f32;
         let mut y = 0.0f32;
         let mut width = 0.0;
@@ -61,7 +61,7 @@ impl<F: AbFont> Font<F> {
             draw_x += advance.horz;
         }
 
-        Layout {
+        GlyphLayout {
             x,
             y,
             width,
@@ -102,8 +102,8 @@ impl<F: AbFont> Font<F> {
         self.font.glyph_id(c).with_scale(size * 1.5)
     }
 
-    pub fn layout(&self, glyph: &Glyph) -> Layout {
-        Layout::from_rect(self.font.glyph_bounds(glyph))
+    pub fn layout(&self, glyph: &Glyph) -> GlyphLayout {
+        GlyphLayout::from_rect(self.font.glyph_bounds(glyph))
     }
 
     pub fn advance(&self, glyph: &Glyph) -> Advance {
@@ -135,14 +135,14 @@ pub struct Advance {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Layout {
+pub struct GlyphLayout {
     pub x: f32,
     pub y: f32,
     pub width: f32,
     pub height: f32,
 }
 
-impl Layout {
+impl GlyphLayout {
     pub fn from_rect(rect: Rect) -> Self {
         let Rect { min, max } = rect;
         let x = min.x;
