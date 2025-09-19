@@ -302,6 +302,13 @@ impl Margin {
             _ => unreachable!(),
         }
     }
+
+    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue<f32> {
+        match self {
+            Self::Length(length) => length.compute(render_arena, id),
+            Self::Auto => ComputedValue::Auto,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -374,6 +381,13 @@ impl Width {
             _ => None,
         }
     }
+
+    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue<f32> {
+        match self {
+            Self::Length(length) => length.compute(render_arena, id),
+            Self::Auto => ComputedValue::Auto,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -388,6 +402,13 @@ impl Height {
             Token::Dimension { value, unit } => Some(Self::Length(Length::from(*value, unit)?)),
             Token::Ident(ident) if ident.as_str() == "auto" => Some(Self::Auto),
             _ => None,
+        }
+    }
+
+    pub fn compute(&self, render_arena: &RenderArena, id: NodeId) -> ComputedValue<f32> {
+        match self {
+            Self::Length(length) => length.compute(render_arena, id),
+            Self::Auto => ComputedValue::Auto,
         }
     }
 }
@@ -455,6 +476,10 @@ impl<T> ComputedValue<T> {
 
     pub fn is_auto(&self) -> bool {
         matches!(self, Self::Auto)
+    }
+
+    pub fn unwrap_or(self, value: T) -> T {
+        if let Self::Value(n) = self { n } else { value }
     }
 
     pub fn unwrap(self) -> T {

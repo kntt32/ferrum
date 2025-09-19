@@ -17,6 +17,13 @@ impl<T> Arena<T> {
         Self { arena: Vec::new() }
     }
 
+    pub fn with_root(value: T) -> Self {
+        let mut this = Self::new();
+        let node_id = this.push(value);
+        assert_eq!(node_id, 0);
+        this
+    }
+
     pub fn push(&mut self, value: T) -> NodeId {
         let node = ArenaNode {
             parent: None,

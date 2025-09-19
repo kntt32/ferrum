@@ -3,6 +3,7 @@ use super::Color;
 use super::Font;
 use crate::arena::Arena;
 use crate::arena::NodeId;
+use crate::css::ComputedValue;
 use crate::css::CssStyle;
 use crate::css::CssomArena;
 use crate::css::Display;
@@ -49,6 +50,12 @@ impl RenderArena {
             padding_right: css_style.padding_right.unwrap().compute(self, id).unwrap(),
             padding_bottom: css_style.padding_bottom.unwrap().compute(self, id).unwrap(),
             padding_left: css_style.padding_left.unwrap().compute(self, id).unwrap(),
+            margin_top: css_style.margin_top.unwrap().compute(self, id),
+            margin_right: css_style.margin_right.unwrap().compute(self, id),
+            margin_bottom: css_style.margin_bottom.unwrap().compute(self, id),
+            margin_left: css_style.margin_left.unwrap().compute(self, id),
+            width: css_style.width.unwrap().compute(self, id),
+            height: css_style.height.unwrap().compute(self, id),
         });
 
         let children: Vec<_> = self.children(id).collect();
@@ -208,4 +215,10 @@ pub struct RenderStyle {
     pub padding_right: f32,
     pub padding_bottom: f32,
     pub padding_left: f32,
+    pub margin_top: ComputedValue<f32>,
+    pub margin_right: ComputedValue<f32>,
+    pub margin_bottom: ComputedValue<f32>,
+    pub margin_left: ComputedValue<f32>,
+    pub width: ComputedValue<f32>,
+    pub height: ComputedValue<f32>,
 }
