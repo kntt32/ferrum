@@ -24,7 +24,7 @@ pub struct RenderArena {
 impl RenderArena {
     pub const ROOT: NodeId = 0;
 
-    pub fn new(dom: &DomArena, cssom: &CssomArena, width: usize, height: usize) -> Self {
+    pub fn new(dom: &DomArena, cssom: &CssomArena) -> Self {
         let mut this = Self {
             arena: Arena::new(),
         };
@@ -103,8 +103,6 @@ impl RenderArena {
     }
 
     fn build_body(&mut self, dom: &DomArena, dom_parent_id: NodeId, arena_parent_id: NodeId) {
-        let parent_css_style = self[arena_parent_id].css_style.inherit();
-
         for dom_child_id in dom.children(dom_parent_id) {
             match dom[dom_child_id].node_type {
                 DomNodeType::Element {
@@ -116,7 +114,7 @@ impl RenderArena {
                             name: name.clone(),
                             attributes: attributes.clone(),
                         },
-                        parent_css_style.clone(),
+                        self[arena_parent_id].css_style.inherit_for_element(),
                     );
                     let arena_child_id = self.arena.insert_child(arena_parent_id, render_node);
                     self.build_body(dom, dom_child_id, arena_child_id);
@@ -131,7 +129,10 @@ impl RenderArena {
                     if !text.is_empty() {
                         self.arena.insert_child(
                             arena_parent_id,
-                            RenderNode::new(RenderNodeType::Text(text), parent_css_style.clone()),
+                            RenderNode::new(
+                                RenderNodeType::Text(text),
+                                self[arena_parent_id].css_style.inherit_for_text(),
+                            ),
                         );
                     }
                 }

@@ -69,21 +69,29 @@ impl CssStyle {
 
         let len = tokens.len();
         let mut i = 0;
-        while i + 2 < tokens.len() {
-            let next_i =
-                i + tokens[i..].partition_point(|token| !matches!(token, Token::Semicolon)) + 1;
+        while i < tokens.len() {
+            let mut next_i = i;
+            while let Some(token) = tokens.get(next_i)
+                && token != &Token::Semicolon
+            {
+                next_i += 1;
+            }
+            next_i += 1;
 
             let Token::Ident(ref key) = tokens[i] else {
                 i = next_i;
                 continue;
             };
 
-            if tokens[i + 1] != Token::Colon {
+            if tokens.get(i + 1) != Some(&Token::Colon) {
                 i = next_i;
                 continue;
             }
 
-            let value = &tokens[i + 2..next_i - 1];
+            let Some(value) = tokens.get(i + 2..next_i - 1) else {
+                i = next_i;
+                continue;
+            };
 
             match key.as_str() {
                 "display" => {
@@ -160,9 +168,16 @@ impl CssStyle {
         Some(this)
     }
 
-    pub fn inherit(&self) -> Self {
+    pub fn inherit_for_element(&self) -> Self {
         let mut this = Self::default();
         this.font_size = self.font_size;
+        this.color = self.color;
+        this
+    }
+
+    pub fn inherit_for_text(&self) -> Self {
+        let mut this = self.inherit_for_element();
+        this.display = Some(Display::Inline);
         this
     }
 

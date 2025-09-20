@@ -8,9 +8,9 @@ use std::io::Write;
 use std::net::TcpStream;
 
 fn main() {
-    const addr: &str = "http://www.google.com/";
+    const ADDR: &str = "http://www.google.com/";
 
-    let url: Url<'_> = addr.try_into().unwrap();
+    let url: Url<'_> = ADDR.try_into().unwrap();
     println!("{:?}", url);
 
     let ip = get_host_addr(url.host(), CLOUDFLARE_DNS).unwrap();

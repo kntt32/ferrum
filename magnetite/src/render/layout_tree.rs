@@ -10,8 +10,8 @@ use std::ops::Deref;
 
 #[derive(Clone, Debug)]
 pub struct LayoutArena {
-    arena: Arena<LayoutBox>, // Block->Block->Line->...
-                             //      ->Line->Flagment
+    arena: Arena<LayoutBox>, // Block->Block->...
+                             //      ->Flagment
 }
 
 impl LayoutArena {
@@ -108,25 +108,20 @@ impl LayoutArena {
         render_arena: &RenderArena,
         render_arena_id: NodeId,
     ) -> (f32, f32, f32) {
-        let height: f32;
-        let margin_top: f32;
-        let margin_bottom: f32;
-
         let style = &render_arena[render_arena_id].style.as_ref().unwrap();
-        let properties = [style.margin_top, style.height, style.margin_bottom];
-        let sum = style.padding_top
-            + style.margin_top.unwrap_or(0.0)
-            + style.height.unwrap_or(0.0)
-            + style.margin_bottom.unwrap_or(0.0)
-            + style.padding_bottom;
 
-        if style.margin_top.is_auto() || style.margin_bottom.is_auto() {
-            margin_top = style.margin_top.unwrap_or(0.0);
-            margin_bottom = style.margin_bottom.unwrap_or(0.0);
-            todo!()
-        }
+        let margin_top = style.margin_top.unwrap_or(0.0);
+        let margin_bottom = style.margin_bottom.unwrap_or(0.0);
 
-        todo!()
+        let height = if style.height.is_auto() {
+            self.children(node_id)
+                .map(|id: NodeId| self[id].layout.height.unwrap())
+                .sum::<usize>() as f32
+        } else {
+            style.height.unwrap()
+        };
+
+        (height, margin_top, margin_bottom)
     }
 
     fn build_block_unreplace_element(
@@ -156,20 +151,26 @@ impl LayoutArena {
                         width: Some(width as usize),
                         height: None,
                         margin_top: None,
-                        margin_right: None,
+                        margin_right: Some(margin_right as usize),
                         margin_bottom: None,
-                        margin_left: None,
+                        margin_left: Some(margin_left as usize),
                     },
                     render_arena_id,
                 };
                 let node_id = self.arena.insert_child(parent_id, layout_box);
 
-                let children: Vec<_> = self.children(render_arena_id).collect();
-                for child in children {
-                    self.build(node_id, render_arena, render_arena_id, width);
+                for child in render_arena.children(render_arena_id).collect::<Vec<_>>() {
+                    self.build(node_id, render_arena, child, width);
                 }
 
-                // TODO
+                let x = 0;
+                let mut y = 0;
+                for child in self.children(node_id).collect::<Vec<_>>() {
+                    self.arena[child].layout.x = Some(x);
+                    self.arena[child].layout.y = Some(y);
+                    y += self.arena[child].layout.height.unwrap() as isize;
+                }
+
                 let (height, margin_top, margin_bottom) = self
                     .calc_block_nonreplaced_height_and_vertical_margin(
                         node_id,
@@ -177,7 +178,9 @@ impl LayoutArena {
                         render_arena_id,
                     );
 
-                todo!();
+                self.arena[node_id].layout.height = Some(height as usize);
+                self.arena[node_id].layout.margin_top = Some(margin_top as usize);
+                self.arena[node_id].layout.margin_bottom = Some(margin_bottom as usize);
             }
             RenderNodeType::Text(ref text) => unreachable!(),
         }
@@ -191,7 +194,7 @@ impl LayoutArena {
     ) {
         match render_arena[render_arena_id].node_type {
             RenderNodeType::Element { .. } => {
-                todo!()
+                todo!("{:?}", render_arena[render_arena_id].css_style.display);
             }
             RenderNodeType::Text(ref text) => {
                 let font_size = render_arena[render_arena_id].style.unwrap().font_size;

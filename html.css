@@ -1,37 +1,49 @@
+body {
+    font-size: 16px;
+    display: block;
+}
+
 h1 {
     font-size: 2em;
     font-weight: bold;
+    display: block;
 }
 
 h2 {
     font-size: 1.5em;
     font-weight: bold;
+    display: block;
 }
 
 h3 {
     font-size: 1.17em;
     font-weight: bold;
+    display: block;
 }
 
 h4 {
     font-weight: bold;
+    display: block;
 }
 
 h5 {
     font-size: .83em;
     font-weight: bold;
+    display: block;
 }
 
 h6 {
     font-size: .67em;
     font-weight: bold;
+    display: block;
 }
 
 p {
-
+    display: block;
 }
 
 a {
-    color: blue,
-    text-decoration-line: underline,
+    display: inline;
+    color: blue;
+    text-decoration-line: underline;
 }
