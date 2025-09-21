@@ -15,7 +15,7 @@ A browser and a rendering engine abide by WHATWG HTML living standard written by
 - [ferrum](https://github.com/kntt32/ferrum/tree/main/ferrum) : Browser app
 - [magnetite](https://github.com/kntt32/ferrum/tree/main/magnetite) : Rendering engine
 - [copper](https://github.com/kntt32/ferrum/tree/main/copper) : Network module including DNS and http cients
-- [assets](https://github.com/kntt32/ferrum/tree/main/assets) : Assets such as fonts
+- [assets](https://github.com/kntt32/ferrum/tree/main/assets) : Assets including fonts
 
 ## References
 - html living standard: https://html.spec.whatwg.org/multipage/
