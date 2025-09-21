@@ -2,6 +2,10 @@ use ops::Deref;
 use ops::DerefMut;
 use ops::Index;
 use ops::IndexMut;
+use std::fmt::Debug;
+use std::fmt::Display;
+use std::fmt::Error;
+use std::fmt::Formatter;
 use std::ops;
 use std::slice::SliceIndex;
 
@@ -12,9 +16,27 @@ pub struct Arena<T> {
     arena: Vec<ArenaNode<T>>,
 }
 
+impl<T: Debug> Display for Arena<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(f, "Arena {{\n")?;
+        for i in 0..self.arena.len() {
+            write!(f, "{}: {:?}\n", i, self[i])?;
+        }
+        write!(f, "}}")?;
+        Ok(())
+    }
+}
+
 impl<T> Arena<T> {
     pub fn new() -> Self {
         Self { arena: Vec::new() }
+    }
+
+    pub fn with_root(value: T) -> Self {
+        let mut this = Self::new();
+        let node_id = this.push(value);
+        assert_eq!(node_id, 0);
+        this
     }
 
     pub fn push(&mut self, value: T) -> NodeId {

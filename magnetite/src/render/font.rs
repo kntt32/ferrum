@@ -1,5 +1,6 @@
-use super::buff::Buff;
-use super::color::Color;
+use super::Buff;
+use super::Color;
+use super::Drawer;
 use ab_glyph::Font as AbFont;
 use ab_glyph::FontRef;
 use ab_glyph::Glyph;
@@ -42,7 +43,7 @@ impl<F: AbFont> Font<F> {
         glyphs
     }
 
-    pub fn layout_str(&self, glyphs: &[Glyph]) -> Layout {
+    pub fn layout_str(&self, glyphs: &[Glyph]) -> GlyphLayout {
         let mut x = 0.0f32;
         let mut y = 0.0f32;
         let mut width = 0.0;
@@ -61,7 +62,7 @@ impl<F: AbFont> Font<F> {
             draw_x += advance.horz;
         }
 
-        Layout {
+        GlyphLayout {
             x,
             y,
             width,
@@ -88,7 +89,7 @@ impl<F: AbFont> Font<F> {
         buffer: &mut impl Buff,
         x: isize,
         y: isize,
-        color: Color,
+        color: impl Drawer,
     ) {
         let mut x = x as f32;
         for glyph in glyphs {
@@ -102,8 +103,8 @@ impl<F: AbFont> Font<F> {
         self.font.glyph_id(c).with_scale(size * 1.5)
     }
 
-    pub fn layout(&self, glyph: &Glyph) -> Layout {
-        Layout::from_rect(self.font.glyph_bounds(glyph))
+    pub fn layout(&self, glyph: &Glyph) -> GlyphLayout {
+        GlyphLayout::from_rect(self.font.glyph_bounds(glyph))
     }
 
     pub fn advance(&self, glyph: &Glyph) -> Advance {
@@ -113,15 +114,22 @@ impl<F: AbFont> Font<F> {
         Advance { horz, vert }
     }
 
-    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: isize, y: isize, color: Color) {
+    pub fn draw(
+        &self,
+        glyph: Glyph,
+        buffer: &mut impl Buff,
+        x: isize,
+        y: isize,
+        color: impl Drawer,
+    ) {
         if let Some(outline_glyph) = self.font.outline_glyph(glyph) {
             let px_bounds = outline_glyph.px_bounds();
             outline_glyph.draw(|draw_rel_x, draw_rel_y, alpha| {
-                if let Some(src) = buffer.get_mut(
+                if let Some(b) = buffer.get_mut(
                     x + draw_rel_x as isize,
                     y + px_bounds.min.y as isize + draw_rel_y as isize,
                 ) {
-                    *src = color.alpha(alpha, Color::from_u32(*src)).as_u32();
+                    color.draw_with_alpha(b, alpha);
                 }
             });
         }
@@ -135,14 +143,14 @@ pub struct Advance {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Layout {
+pub struct GlyphLayout {
     pub x: f32,
     pub y: f32,
     pub width: f32,
     pub height: f32,
 }
 
-impl Layout {
+impl GlyphLayout {
     pub fn from_rect(rect: Rect) -> Self {
         let Rect { min, max } = rect;
         let x = min.x;

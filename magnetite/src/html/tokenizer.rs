@@ -36,6 +36,10 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
+    pub fn run(&mut self) {
+        while self.step().is_some() {}
+    }
+
     pub fn state(&self) -> State {
         self.state
     }

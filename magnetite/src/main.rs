@@ -8,6 +8,7 @@ use magnetite::css::Origin;
 use magnetite::css::Parser;
 use magnetite::css::Tokenizer as CssTokenizer;
 use magnetite::html;
+use magnetite::render::LayoutArena;
 use magnetite::render::RenderArena;
 use std::io::Cursor;
 
@@ -62,15 +63,14 @@ fn html_demo() {
         <style>
             h1 {
                 color: blue;
-                font-size: 20px;
             }
         </style>
     </head>
     <body>
         <h1>
-            Hello
+            Hello, 
         </h1>
-        <p>World!</p>
+        <h1>World!</h1>
     </body>
 </html>"#,
     );
@@ -79,21 +79,11 @@ fn html_demo() {
     let input_stream_preprocessor = InputStreamPreprocessor::new(byte_stream_decoder).unwrap();
     let mut tree_constructor = TreeConstructor::new();
     let mut tokenizer = Tokenizer::new(input_stream_preprocessor, &mut tree_constructor);
-
-    loop {
-        if tokenizer.step().is_none() {
-            break;
-        }
-    }
-
+    tokenizer.run();
     let dom = tree_constructor.take_dom();
-    println!("{:?}", dom);
-    println!("{:?}", dom.style());
-
     let cssom = dom.cssom();
-    let render_arena = RenderArena::new(&dom, &cssom, 400, 300);
-    println!("{:?}", render_arena);
-
-    let cssom = dom.cssom();
-    println!("{:?}", cssom);
+    let render_arena = RenderArena::new(&dom, &cssom);
+    println!("{}", *render_arena);
+    let layout_arena = LayoutArena::new(&render_arena, 400.0);
+    println!("{}", *layout_arena);
 }
