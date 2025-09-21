@@ -1,5 +1,6 @@
-use super::buff::Buff;
-use super::color::Color;
+use super::Buff;
+use super::Color;
+use super::Drawer;
 use ab_glyph::Font as AbFont;
 use ab_glyph::FontRef;
 use ab_glyph::Glyph;
@@ -88,7 +89,7 @@ impl<F: AbFont> Font<F> {
         buffer: &mut impl Buff,
         x: isize,
         y: isize,
-        color: Color,
+        color: impl Drawer,
     ) {
         let mut x = x as f32;
         for glyph in glyphs {
@@ -113,15 +114,22 @@ impl<F: AbFont> Font<F> {
         Advance { horz, vert }
     }
 
-    pub fn draw(&self, glyph: Glyph, buffer: &mut impl Buff, x: isize, y: isize, color: Color) {
+    pub fn draw(
+        &self,
+        glyph: Glyph,
+        buffer: &mut impl Buff,
+        x: isize,
+        y: isize,
+        color: impl Drawer,
+    ) {
         if let Some(outline_glyph) = self.font.outline_glyph(glyph) {
             let px_bounds = outline_glyph.px_bounds();
             outline_glyph.draw(|draw_rel_x, draw_rel_y, alpha| {
-                if let Some(src) = buffer.get_mut(
+                if let Some(b) = buffer.get_mut(
                     x + draw_rel_x as isize,
                     y + px_bounds.min.y as isize + draw_rel_y as isize,
                 ) {
-                    *src = color.alpha(alpha, Color::from_u32(*src)).as_u32();
+                    color.draw_with_alpha(b, alpha);
                 }
             });
         }

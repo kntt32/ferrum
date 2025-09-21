@@ -1,3 +1,4 @@
+use super::Drawer;
 use std::fmt::Display;
 use std::fmt::Error;
 use std::fmt::Formatter;
@@ -109,6 +110,17 @@ impl Color {
     }
 }
 
+impl Drawer for Color {
+    fn draw(&self, b: &mut u32) {
+        *b = self.as_u32();
+    }
+
+    fn draw_with_alpha(&self, b: &mut u32, alpha: f32) {
+        let base = Color::from_u32(*b);
+        *b = self.alpha(alpha, base).as_u32();
+    }
+}
+
 impl MulAssign<f32> for Color {
     fn mul_assign(&mut self, rhs: f32) {
         *self = *self * rhs
@@ -213,6 +225,22 @@ impl AlphaColor {
             color: Color::from_str_noprefix(s)?,
             alpha: 1.0,
         })
+    }
+}
+
+impl Drawer for AlphaColor {
+    fn draw(&self, b: &mut u32) {
+        if self.alpha == 1.0 {
+            *b = self.color.as_u32();
+        } else {
+            let base = Color::from_u32(*b);
+            *b = self.color.alpha(self.alpha, base).as_u32();
+        }
+    }
+
+    fn draw_with_alpha(&self, b: &mut u32, alpha: f32) {
+        let base = Color::from_u32(*b);
+        *b = self.color.alpha(self.alpha * alpha, base).as_u32();
     }
 }
 

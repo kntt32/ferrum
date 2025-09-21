@@ -11,16 +11,21 @@ use std::ops::Deref;
 #[derive(Clone, Debug)]
 pub struct LayoutArena {
     arena: Arena<LayoutBox>, // Block->Block->...
-                             //      ->Flagment
+                             //      ->Line->Flagment
 }
 
 impl LayoutArena {
     pub fn new(render_arena: &RenderArena, containing_width: f32) -> Self {
         let mut this = Self {
-            arena: Arena::with_root(LayoutBox::body(render_arena, containing_width as usize)),
+            arena: Arena::with_root(LayoutBox::root(containing_width as usize)),
         };
 
         this.build(0, render_arena, 0, containing_width);
+        let body_id = this[0].child().unwrap();
+        let body_layout = &mut this.arena[body_id].layout;
+        body_layout.x = Some(0);
+        body_layout.y = Some(0);
+        this.arena[0].layout.height = Some(body_layout.height.unwrap());
 
         this
     }
@@ -115,7 +120,14 @@ impl LayoutArena {
 
         let height = if style.height.is_auto() {
             self.children(node_id)
-                .map(|id: NodeId| self[id].layout.height.unwrap())
+                .map(|id: NodeId| {
+                    let layout = &self[id].layout;
+                    layout.margin_top.unwrap()
+                        + layout.padding_top
+                        + layout.height.unwrap()
+                        + layout.padding_bottom
+                        + layout.margin_bottom.unwrap()
+                })
                 .sum::<usize>() as f32
         } else {
             style.height.unwrap()
@@ -131,6 +143,7 @@ impl LayoutArena {
         render_arena_id: NodeId,
     ) {
         let containing_width = self[parent_id].layout.width.unwrap();
+        let style = &render_arena[render_arena_id].style.as_ref().unwrap();
 
         match render_arena[render_arena_id].node_type {
             RenderNodeType::Element {
@@ -154,8 +167,12 @@ impl LayoutArena {
                         margin_right: Some(margin_right as usize),
                         margin_bottom: None,
                         margin_left: Some(margin_left as usize),
+                        padding_top: style.padding_top as usize,
+                        padding_right: style.padding_right as usize,
+                        padding_bottom: style.padding_bottom as usize,
+                        padding_left: style.padding_left as usize,
                     },
-                    render_arena_id,
+                    render_arena_id: Some(render_arena_id),
                 };
                 let node_id = self.arena.insert_child(parent_id, layout_box);
 
@@ -168,7 +185,12 @@ impl LayoutArena {
                 for child in self.children(node_id).collect::<Vec<_>>() {
                     self.arena[child].layout.x = Some(x);
                     self.arena[child].layout.y = Some(y);
-                    y += self.arena[child].layout.height.unwrap() as isize;
+                    let layout = &self.arena[child].layout;
+                    y += (layout.margin_top.unwrap()
+                        + layout.padding_top
+                        + layout.height.unwrap()
+                        + layout.padding_bottom
+                        + layout.margin_bottom.unwrap()) as isize;
                 }
 
                 let (height, margin_top, margin_bottom) = self
@@ -194,7 +216,7 @@ impl LayoutArena {
     ) {
         match render_arena[render_arena_id].node_type {
             RenderNodeType::Element { .. } => {
-                todo!("{:?}", render_arena[render_arena_id].css_style.display);
+                // todo!("{:?}", render_arena[render_arena_id].css_style.display);
             }
             RenderNodeType::Text(ref text) => {
                 let font_size = render_arena[render_arena_id].style.unwrap().font_size;
@@ -206,25 +228,45 @@ impl LayoutArena {
                     width,
                     height,
                 } = font.layout_str(&glyphs);
-                let node_type = LayoutType::Fragment(LineFlagment::Text {
-                    text: text.clone(),
-                    render_arena_id,
-                });
-                let layout_box = LayoutBox {
+                let node_type = LayoutType::Fragment(LineFlagment::Text(text.clone()));
+                let mut layout_box = LayoutBox {
                     node_type,
                     layout: Layout {
                         x: None,
                         y: None,
-                        width: Some((width - x) as usize),
-                        height: Some((height - y) as usize), // TODO
-                        margin_top: None,
-                        margin_right: None,
-                        margin_bottom: None,
-                        margin_left: None,
+                        width: Some(width as usize),
+                        height: Some(height as usize), // TODO
+                        margin_top: Some(0),
+                        margin_right: Some(0),
+                        margin_bottom: Some(0),
+                        margin_left: Some(0),
+                        padding_top: 0,
+                        padding_right: 0,
+                        padding_bottom: 0,
+                        padding_left: 0,
                     },
-                    render_arena_id,
+                    render_arena_id: Some(render_arena_id),
                 };
-                self.arena.insert_child(parent_id, layout_box);
+
+                if let Some(last_sibling) = self.children(parent_id).last()
+                    && self[last_sibling].node_type == LayoutType::Line
+                {
+                    let layout = &mut layout_box.layout;
+                    let line_layout = &mut self.arena[last_sibling].layout;
+                    layout.x = Some(line_layout.width.unwrap() as isize);
+                    layout.y = Some(0);
+                    *line_layout.width.as_mut().unwrap() += layout.width.unwrap();
+                    *line_layout.height.as_mut().unwrap() =
+                        line_layout.height.unwrap().max(layout.height.unwrap());
+                    self.arena.insert_child(last_sibling, layout_box);
+                } else {
+                    let layout = &mut layout_box.layout;
+                    layout.x = Some(0);
+                    layout.y = Some(0);
+                    let line = LayoutBox::line(layout.width.unwrap(), layout.height.unwrap());
+                    let line_id = self.arena.insert_child(parent_id, line);
+                    self.arena.insert_child(line_id, layout_box);
+                }
             }
         }
     }
@@ -240,47 +282,65 @@ impl Deref for LayoutArena {
 
 #[derive(Clone, Debug)]
 pub struct LayoutBox {
-    node_type: LayoutType,
-    layout: Layout,
-    render_arena_id: NodeId,
+    pub node_type: LayoutType,
+    pub layout: Layout,
+    pub render_arena_id: Option<NodeId>,
 }
 
 impl LayoutBox {
-    pub fn body(render_arena: &RenderArena, width: usize) -> Self {
-        let render_node = &render_arena[0];
-        let RenderNodeType::Element { .. } = render_node.node_type else {
-            panic!("invalid render tree");
-        };
-
-        LayoutBox {
-            node_type: LayoutType::Block,
+    pub fn line(width: usize, height: usize) -> Self {
+        Self {
+            node_type: LayoutType::Line,
             layout: Layout {
                 x: None,
                 y: None,
+                width: Some(width),
+                height: Some(height),
+                margin_top: Some(0),
+                margin_right: Some(0),
+                margin_bottom: Some(0),
+                margin_left: Some(0),
+                padding_top: 0,
+                padding_right: 0,
+                padding_bottom: 0,
+                padding_left: 0,
+            },
+            render_arena_id: None,
+        }
+    }
+
+    pub fn root(width: usize) -> Self {
+        LayoutBox {
+            node_type: LayoutType::Block,
+            layout: Layout {
+                x: Some(0),
+                y: Some(0),
                 width: Some(width),
                 height: None,
                 margin_top: Some(0),
                 margin_right: Some(0),
                 margin_bottom: Some(0),
                 margin_left: Some(0),
+                padding_top: 0,
+                padding_right: 0,
+                padding_bottom: 0,
+                padding_left: 0,
             },
-            render_arena_id: 0,
+            render_arena_id: None,
         }
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LayoutType {
     Block,
+    Line,
     Fragment(LineFlagment),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum LineFlagment {
-    Text {
-        text: String,
-        render_arena_id: NodeId,
-    },
+    Text(String),
     // Replacement{..},
 }
 
@@ -297,12 +357,35 @@ impl LineFlagment {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Layout {
-    x: Option<isize>,
-    y: Option<isize>,
-    width: Option<usize>,
-    height: Option<usize>,
-    margin_top: Option<usize>,
-    margin_right: Option<usize>,
-    margin_bottom: Option<usize>,
-    margin_left: Option<usize>,
+    pub x: Option<isize>,
+    pub y: Option<isize>,
+    pub width: Option<usize>,
+    pub height: Option<usize>,
+    pub margin_top: Option<usize>,
+    pub margin_right: Option<usize>,
+    pub margin_bottom: Option<usize>,
+    pub margin_left: Option<usize>,
+    pub padding_top: usize,
+    pub padding_right: usize,
+    pub padding_bottom: usize,
+    pub padding_left: usize,
+}
+
+impl Default for Layout {
+    fn default() -> Self {
+        Self {
+            x: None,
+            y: None,
+            width: None,
+            height: None,
+            margin_top: None,
+            margin_right: None,
+            margin_bottom: None,
+            margin_left: None,
+            padding_top: 0,
+            padding_right: 0,
+            padding_bottom: 0,
+            padding_left: 0,
+        }
+    }
 }

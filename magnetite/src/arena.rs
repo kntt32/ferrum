@@ -20,7 +20,7 @@ impl<T: Debug> Display for Arena<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         write!(f, "Arena {{\n")?;
         for i in 0..self.arena.len() {
-            write!(f, "    {}: {:?}\n", i, self[i])?;
+            write!(f, "{}: {:?}\n", i, self[i])?;
         }
         write!(f, "}}")?;
         Ok(())

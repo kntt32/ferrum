@@ -64,12 +64,31 @@ pub fn view() {
 </div>
 </body></html>
 "#,
-    );
+    ); /*
+    let stream = Cursor::new(
+    r#"
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
+    h1 {
+    color: blue;
+    }
+    </style>
+    </head>
+    <body>
+    <h1>
+    Hello,
+    </h1>
+    <p>World!</p>
+    </body>
+    </html>"#,
+    );*/
 
     let mut app = Ferrum::new(
         stream,
-        NonZeroU32::new(400).unwrap(),
-        NonZeroU32::new(300).unwrap(),
+        NonZeroU32::new(800).unwrap(),
+        NonZeroU32::new(600).unwrap(),
     );
     let event_loop = EventLoop::new().unwrap();
     event_loop.run_app(&mut app).unwrap();
@@ -98,9 +117,11 @@ impl Ferrum {
         }
         let dom = tree_constructor.take_dom();
         let cssom = dom.cssom();
-        let render_arena =
-            RenderArena::new(&dom, &cssom, width.get() as usize, height.get() as usize);
-        let renderer = Renderer::new(render_arena);
+        let render_arena = RenderArena::new(&dom, &cssom);
+        println!("{}", *render_arena);
+        let layout_arena = LayoutArena::new(&render_arena, width.get() as f32);
+        println!("{}", *layout_arena);
+        let renderer = Renderer::new(render_arena, layout_arena);
 
         Self {
             width,
@@ -117,14 +138,9 @@ impl Ferrum {
         self.width = width;
         self.height = height;
 
-        let render_arena = RenderArena::new(
-            &self.dom,
-            &self.cssom,
-            width.get() as usize,
-            height.get() as usize,
-        );
-        let renderer = Renderer::new(render_arena);
-        self.renderer = renderer;
+        let render_arena = RenderArena::new(&self.dom, &self.cssom);
+        let layout_arena = LayoutArena::new(&render_arena, width.get() as f32);
+        self.renderer = Renderer::new(render_arena, layout_arena);
 
         let window = self.window.as_ref().unwrap().clone();
         let context = Context::new(window.clone()).unwrap();

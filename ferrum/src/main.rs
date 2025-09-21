@@ -1,5 +1,5 @@
-// use ferrum::view;
+use ferrum::view;
 
 fn main() {
-    // view()
+    view()
 }

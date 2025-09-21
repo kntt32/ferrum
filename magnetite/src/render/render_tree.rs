@@ -28,8 +28,7 @@ impl RenderArena {
         let mut this = Self {
             arena: Arena::new(),
         };
-        this.build_tree(dom);
-        this.apply_css_style(cssom);
+        this.build_tree(dom, cssom);
         this.calc_render_style();
 
         this
@@ -64,10 +63,6 @@ impl RenderArena {
         }
     }
 
-    fn apply_css_style(&mut self, cssom: &CssomArena) {
-        self.apply_css_style_for(0, cssom);
-    }
-
     fn apply_css_style_for(&mut self, id: NodeId, cssom: &CssomArena) {
         for rule in cssom.rules() {
             if cssom[*rule].selector().match_with(self, id) {
@@ -76,18 +71,18 @@ impl RenderArena {
         }
     }
 
-    fn build_tree(&mut self, dom: &DomArena) {
+    fn build_tree(&mut self, dom: &DomArena, cssom: &CssomArena) {
         for dom_child_id in dom.children(DomArena::DOCUMENT_IDX) {
             if let DomNodeType::Element { ref name, .. } = dom[dom_child_id].node_type
                 && name == "html"
             {
-                self.build_html(dom, dom_child_id);
+                self.build_html(dom, dom_child_id, cssom);
                 break;
             }
         }
     }
 
-    fn build_html(&mut self, dom: &DomArena, dom_parent_id: NodeId) {
+    fn build_html(&mut self, dom: &DomArena, dom_parent_id: NodeId, cssom: &CssomArena) {
         for dom_child_id in dom.children(dom_parent_id) {
             if let DomNodeType::Element {
                 ref name,
@@ -95,14 +90,21 @@ impl RenderArena {
             } = dom[dom_child_id].node_type
                 && name == "body"
             {
-                self.arena.push(Node::body(attributes.clone()));
-                self.build_body(dom, dom_child_id, 0);
+                let body_id = self.arena.push(Node::body(attributes.clone()));
+                self.apply_css_style_for(body_id, cssom);
+                self.build_body(dom, dom_child_id, 0, cssom);
                 break;
             }
         }
     }
 
-    fn build_body(&mut self, dom: &DomArena, dom_parent_id: NodeId, arena_parent_id: NodeId) {
+    fn build_body(
+        &mut self,
+        dom: &DomArena,
+        dom_parent_id: NodeId,
+        arena_parent_id: NodeId,
+        cssom: &CssomArena,
+    ) {
         for dom_child_id in dom.children(dom_parent_id) {
             match dom[dom_child_id].node_type {
                 DomNodeType::Element {
@@ -117,7 +119,8 @@ impl RenderArena {
                         self[arena_parent_id].css_style.inherit_for_element(),
                     );
                     let arena_child_id = self.arena.insert_child(arena_parent_id, render_node);
-                    self.build_body(dom, dom_child_id, arena_child_id);
+                    self.apply_css_style_for(arena_child_id, cssom);
+                    self.build_body(dom, dom_child_id, arena_child_id, cssom);
                 }
                 DomNodeType::String(ref s) => {
                     let mut text_chars = s.trim().chars().collect::<Vec<char>>();
@@ -127,13 +130,14 @@ impl RenderArena {
                         .collect::<String>()
                         .replace(|c: char| c.is_whitespace(), " ");
                     if !text.is_empty() {
-                        self.arena.insert_child(
+                        let arena_child_id = self.arena.insert_child(
                             arena_parent_id,
                             RenderNode::new(
                                 RenderNodeType::Text(text),
                                 self[arena_parent_id].css_style.inherit_for_text(),
                             ),
                         );
+                        self.apply_css_style_for(arena_child_id, cssom);
                     }
                 }
                 _ => {}

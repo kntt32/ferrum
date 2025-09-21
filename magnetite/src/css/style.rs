@@ -170,7 +170,7 @@ impl CssStyle {
 
     pub fn inherit_for_element(&self) -> Self {
         let mut this = Self::default();
-        this.font_size = self.font_size;
+        this.font_size = Some(FontSize::Length(Length::Em(Num::Integer(1))));
         this.color = self.color;
         this
     }
