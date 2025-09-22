@@ -216,7 +216,29 @@ impl LayoutArena {
     ) {
         match render_arena[render_arena_id].node_type {
             RenderNodeType::Element { .. } => {
-                // todo!("{:?}", render_arena[render_arena_id].css_style.display);
+                let line_id = if let Some(last_sibling) = self.arena.children(parent_id).last() {
+                    last_sibling
+                } else {
+                    let line = LayoutBox::line(0, 0);
+                    self.arena.insert_child(parent_id, line)
+                };
+
+                for child in render_arena.children(render_arena_id).collect::<Vec<_>>() {
+                    self.build(line_id, render_arena, child, 0.0);
+                }
+
+                let mut x = self.arena[line_id].layout.width.unwrap();
+                let y = 0;
+                let mut line_height = 0;
+                for child_layout_id in self.arena.children(line_id).collect::<Vec<_>>() {
+                    let child_layout = &mut self.arena[child_layout_id].layout;
+                    child_layout.x = Some(x as isize);
+                    child_layout.y = Some(y);
+                    x += child_layout.width.unwrap();
+                    line_height = line_height.max(child_layout.height.unwrap());
+                }
+                self.arena[line_id].layout.width = Some(x);
+                self.arena[line_id].layout.height = Some(line_height);
             }
             RenderNodeType::Text(ref text) => {
                 let font_size = render_arena[render_arena_id].style.unwrap().font_size;
@@ -342,17 +364,6 @@ pub enum LayoutType {
 pub enum LineFlagment {
     Text(String),
     // Replacement{..},
-}
-
-impl LineFlagment {
-    pub fn split(
-        self,
-        render_arena: &RenderArena,
-        containing_width: usize,
-        remaining_width: usize,
-    ) -> (Self, Option<Self>) {
-        todo!()
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
