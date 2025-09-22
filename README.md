@@ -5,7 +5,7 @@
 [![Rust](https://github.com/kntt32/ferrum/actions/workflows/rust.yml/badge.svg)](https://github.com/kntt32/ferrum/actions/workflows/rust.yml)
 ![Html](https://img.shields.io/badge/HTML-living_standard-blue?logo=HTML5)
 
-[ferrum demo.webm](https://github.com/user-attachments/assets/9f8ffcab-f37d-4a8d-acfa-2101d2bbaf79)
+[Screencast from 2025-09-22 22-09-48.webm](https://github.com/user-attachments/assets/553598bc-2344-437f-8814-74f391087579)
 
 [example.com](https://www.example.com/)
 
