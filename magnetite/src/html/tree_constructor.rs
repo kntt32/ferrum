@@ -319,7 +319,9 @@ impl TreeConstructor {
                 self.insert_comment(text);
             }
             Token::Doctype { .. } => self.error(ParseError::UnexpectedDoctype),
-            Token::StartTag { name, attributes } if &name == "html" => {
+            Token::StartTag {
+                name, attributes, ..
+            } if &name == "html" => {
                 self.error(ParseError::UnexpectedStartTag);
                 if let Some(html_idx) = self.arena.get_child_element(DomArena::DOCUMENT_IDX, "html")
                     && let DomNodeType::Element {
@@ -394,9 +396,9 @@ impl TreeConstructor {
                     self.switch_to(InsertionMode::AfterBody);
                 }
             }
-            Token::StartTag { name, attributes }
-                if ["h1", "h2", "h3", "h4", "h5", "h6"].contains(&name.as_str()) =>
-            {
+            Token::StartTag {
+                name, attributes, ..
+            } if ["h1", "h2", "h3", "h4", "h5", "h6"].contains(&name.as_str()) => {
                 if self.opened_element("p") {
                     self.close_element("p");
                 }
@@ -408,7 +410,9 @@ impl TreeConstructor {
                 }
                 self.insert_element(name, attributes);
             }
-            Token::StartTag { name, attributes } => {
+            Token::StartTag {
+                name, attributes, ..
+            } => {
                 self.reconstruct_the_active_formatting_elements();
                 self.insert_element(name, attributes);
             }
@@ -693,7 +697,9 @@ impl TreeConstructor {
                 self.switch_to(InsertionMode::InBody);
                 self.handle_token(token);
             }
-            Token::StartTag { name, attributes } if name == "head" => {
+            Token::StartTag {
+                name, attributes, ..
+            } if name == "head" => {
                 let head_idx = self.insert_element(name, attributes);
                 self.head_element = Some(head_idx);
                 self.switch_to(InsertionMode::InHead);
@@ -722,7 +728,9 @@ impl TreeConstructor {
             }
             Token::Character(c)
                 if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{000d}', '\u{0020}'].contains(&c) => {}
-            Token::StartTag { name, attributes } if &name == "html" => {
+            Token::StartTag {
+                name, attributes, ..
+            } if &name == "html" => {
                 self.insert_element(name, attributes);
                 self.switch_to(InsertionMode::BeforeHead);
             }

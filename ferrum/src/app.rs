@@ -1,3 +1,7 @@
+use copper::dns;
+use copper::http::HttpRequest;
+use copper::http::HttpResponse;
+use copper::url::Url;
 use magnetite::css::CssomArena;
 use magnetite::html::*;
 use magnetite::render::*;
@@ -5,6 +9,8 @@ use softbuffer::Context;
 use softbuffer::Surface;
 use std::io::Cursor;
 use std::io::Read;
+use std::io::Write;
+use std::net::TcpStream;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use winit::application::ApplicationHandler;
@@ -15,6 +21,24 @@ use winit::event_loop::ActiveEventLoop;
 use winit::event_loop::EventLoop;
 use winit::window::Window;
 use winit::window::WindowId;
+
+fn get_stream() -> impl Read {
+    const ADDR: &str = "http://www.example.com/";
+
+    let url: Url<'_> = ADDR.try_into().unwrap();
+    let ip = dns::get_host_addr(url.host(), dns::CLOUDFLARE_DNS).unwrap();
+
+    let mut http_request = HttpRequest::new("GET", url);
+    let http_message = http_request.as_bytes();
+
+    let mut tcp = TcpStream::connect((ip, 80)).unwrap();
+    tcp.write(&http_message).unwrap();
+    let mut response_message = Vec::new();
+    tcp.read_to_end(&mut response_message).unwrap();
+    let response = HttpResponse::from_bytes(&response_message).unwrap();
+    println!("{}", str::from_utf8(response.content()).unwrap());
+    Cursor::new(response.content().to_vec())
+}
 
 pub fn view() {
     let stream = Cursor::new(
@@ -64,26 +88,9 @@ pub fn view() {
 </div>
 </body></html>
 "#,
-    ); /*
-    let stream = Cursor::new(
-    r#"
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <style>
-    h1 {
-    color: blue;
-    }
-    </style>
-    </head>
-    <body>
-    <h1>
-    Hello,
-    </h1>
-    <p>World!</p>
-    </body>
-    </html>"#,
-    );*/
+    );
+
+    let stream = get_stream();
 
     let mut app = Ferrum::new(
         stream,

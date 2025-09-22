@@ -408,6 +408,7 @@ name = "ferrum"
 version = "0.1.0"
 dependencies = [
  "ab_glyph",
+ "copper",
  "magnetite",
  "softbuffer",
  "winit",

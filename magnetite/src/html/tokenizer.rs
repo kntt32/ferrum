@@ -155,10 +155,77 @@ impl<'a> Tokenizer<'a> {
             State::AttributeValueSingleQuoted => self.step_attribute_value_single_quoted(),
             State::AttributeValueUnquoted => self.step_attribute_value_unquoted(),
             State::AfterAttributeValueQuoted => self.step_after_attribute_value_quoted(),
+            State::AfterAttributeName => self.step_after_attribute_name(),
+            State::SelfClosingStartTag => self.step_self_closing_start_tag(),
             _ => unimplemented!("{:?}\n{:?}", self.state, &self.string[self.string_index..]),
         }
 
         Some(())
+    }
+
+    fn step_self_closing_start_tag(&mut self) {
+        match self.read() {
+            Some('>') => {
+                let Some(Token::StartTag {
+                    ref mut self_closing_flag,
+                    ref mut attributes,
+                    ..
+                }) = self.temporary_token
+                else {
+                    panic!();
+                };
+                *self_closing_flag = true;
+                if let Some(attribute) = self.current_attribute.take() {
+                    attributes.insert(attribute.0, attribute.1);
+                }
+
+                self.switch_to(State::Data);
+                let temporary_token = self.temporary_token.take().unwrap();
+                self.emit(temporary_token);
+            }
+            None => {
+                self.error(ParseError::EofInTag);
+                self.emit(Token::Eof);
+            }
+            other => {
+                self.error(ParseError::UnexpectedSolidusInTag);
+                self.unread(other);
+                self.switch_to(State::BeforeAttributeName);
+            }
+        }
+    }
+
+    fn step_after_attribute_name(&mut self) {
+        match self.read() {
+            Some(c) if ['\u{0009}', '\u{000a}', '\u{000c}', '\u{0020}'].contains(&c) => {}
+            Some('/') => {
+                self.switch_to(State::SelfClosingStartTag);
+            }
+            Some('=') => {
+                self.switch_to(State::BeforeAttributeValue);
+            }
+            Some('>') => {
+                self.switch_to(State::Data);
+                if let Some(current_attribute) = self.current_attribute.take() {
+                    let Some(Token::StartTag {
+                        ref mut attributes, ..
+                    }) = self.temporary_token
+                    else {
+                        panic!();
+                    };
+                    attributes.insert(current_attribute.0, current_attribute.1);
+                }
+                let temporary_token = self.temporary_token.take().unwrap();
+                self.emit(temporary_token);
+            }
+            None => {
+                self.error(ParseError::EofInTag);
+                self.emit(Token::Eof);
+            }
+            Some(c) => {
+                self.current_attribute = Some((String::from(c), String::new()));
+            }
+        }
     }
 
     fn step_after_attribute_value_quoted(&mut self) {
@@ -853,6 +920,7 @@ pub enum ParseError {
     MissingAttributeValue,
     UnexpectedCharacterInAttributeValue,
     UnexpectedCharacterInAttributeName,
+    UnexpectedSolidusInTag,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -953,6 +1021,7 @@ pub enum Token {
     StartTag {
         name: String,
         attributes: HashMap<String, String>,
+        self_closing_flag: bool,
     },
     EndTag {
         name: String,
@@ -967,6 +1036,7 @@ impl Token {
         Self::StartTag {
             name: String::new(),
             attributes: HashMap::new(),
+            self_closing_flag: false,
         }
     }
 }
