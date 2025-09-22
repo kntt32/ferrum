@@ -1,9 +1,0 @@
-[package]
-name = "aqua"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-softbuffer = "=0.4.6"
-winit = "0.30.12"
-ab_glyph = "0.2.31"
